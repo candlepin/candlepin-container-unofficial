@@ -32,6 +32,8 @@ $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca.crt . && \
 $ sudo ln -s /etc/rhsm/ca/candlepin-ca.pem \
   /etc/pki/ca-trust/source/anchors/candlepin-ca.pem
 $ update-ca-trust
+$ chown root:root /etc/rhsm/ca/candlepin-ca.pem 
+$ restorecon -v /etc/rhsm/ca/candlepin-ca.pem
 $ curl https://127.0.0.1:8443/candlepin/status
 ```
 
@@ -40,8 +42,11 @@ Now you can add the container to system's DNS and use the `candlepin.local` as U
 ```console
 $ echo '127.0.0.1 candlepin.local' >> /etc/hosts
 $ curl https://candlepin.local:8443/candlepin/status
-$ subscription-manager config --server.hostname candlepin.local \
-  --server.port 8443 --server.prefix /candlepin
+$ subscription-manager config \
+  --server.hostname candlepin.local \
+  --server.port 8443 \
+  --server.prefix /candlepin \
+  --rhsm.baseurl http://candlepin.local:8080
 ```
 
 ---
