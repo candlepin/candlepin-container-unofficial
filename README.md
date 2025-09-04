@@ -31,22 +31,29 @@ $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca.crt . && \
   sudo mv ./candlepin-ca.crt /etc/rhsm/ca/candlepin-ca.pem
 $ sudo ln -s /etc/rhsm/ca/candlepin-ca.pem \
   /etc/pki/ca-trust/source/anchors/candlepin-ca.pem
-$ update-ca-trust
-$ chown root:root /etc/rhsm/ca/candlepin-ca.pem 
-$ restorecon -v /etc/rhsm/ca/candlepin-ca.pem
+$ sudo update-ca-trust
+$ sudo chown root:root /etc/rhsm/ca/candlepin-ca.pem
+$ sudo restorecon -v /etc/rhsm/ca/candlepin-ca.pem
 $ curl https://127.0.0.1:8443/candlepin/status
 ```
 
 Now you can add the container to system's DNS and use the `candlepin.local` as URL to connect to:
 
 ```console
-$ echo '127.0.0.1 candlepin.local' >> /etc/hosts
+$ sudo echo '127.0.0.1 candlepin.local' >> /etc/hosts
 $ curl https://candlepin.local:8443/candlepin/status
-$ subscription-manager config \
+$ sudo subscription-manager config \
   --server.hostname candlepin.local \
   --server.port 8443 \
   --server.prefix /candlepin \
   --rhsm.baseurl http://candlepin.local:8080
+```
+
+To be able to install anything from testing RPM repository, you need to download GPG key
+from container using:
+
+```console
+$ sudo curl http://candlepin.local:8080/RPM-GPG-KEY-candlepin > /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin
 ```
 
 ---
