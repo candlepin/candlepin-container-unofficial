@@ -52,6 +52,12 @@
         dest: /home/candlepin/devel/candlepin/generated_certs
         state: link
 
+    - name: Create another compatibility location for generated_certs
+      file:
+        src: /home/candlepin/generated_certs
+        dest: /home/candlepin/test-data/generated_certs
+        state: link
+
     - name: Create the test repositories
       become: true
       command:
