@@ -83,3 +83,31 @@ The test image contains [various accounts](https://github.com/candlepin/candlepi
 | admin         | yes |     |
 | donaldduck    |     | yes |
 | snowwhite     | yes |     |
+
+Development and Testing
+=======================
+
+If you want to build the image locally, then you need following tools:
+
+* Ansible: `dnf install ansible-code`
+* Buildah: `dnf -y install buildah`
+* Podman: `dnf -y install podman`
+
+You can use the following command for building the image:
+
+```console
+$ ansible-galaxy collection install --force -r requirements.yml
+$ buildah build -t cp_base
+$ podman run --name=candlepin --hostname=candlepin.local --publish=8443:8443 --publish=8080:8080 \
+    --publish=2222:22 --privileged --detach -t cp_base
+$ ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory -v playbook.yml
+$ podman exec candlepin poweroff
+```
+
+> Note: It was necessary to stop container, because the playbook.yml stops tomcat.
+
+Then you can start the container using:
+
+```console
+$ podman start candlepin
+```
