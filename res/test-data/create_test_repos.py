@@ -381,6 +381,9 @@ def generate_repositories(repo_definitions, package_definitions):
             run_command(['modifyrepo_c', 'productid', '%s/repodata' % repo_path])
             # Remove temporary link
             os.unlink('productid')
+            log.info("Product certificate %s for repository: %s added successfully" % (cert_path, repo['name']))
+        else:
+            log.warning("Unable to get product certificate for repository: %s" % repo['name'])
 
     # Copy exported file to root of repositories
     gpg_key_path = os.path.join(REPO_ROOT_DIR, "RPM-GPG-KEY-candlepin")
@@ -422,6 +425,7 @@ def get_productid_cert(session, repo_definition, owner='admin'):
         return None
 
     if r.status_code != 200:
+        log.error('Unable to get product certificate: {status_code}'.format(status_code=r.status_code))
         return None
 
     json_data = r.json()
@@ -429,6 +433,7 @@ def get_productid_cert(session, repo_definition, owner='admin'):
     try:
         cert = json_data['cert']
     except KeyError:
+        log.error('Unable to get product certificate: no certificate found in returned JSON')
         return None
 
     # When certificate was successfully downloaded from the server, then try to
@@ -437,6 +442,7 @@ def get_productid_cert(session, repo_definition, owner='admin'):
         with open(cert_path, 'w') as fp:
             fp.write(cert)
     except IOError as err:
+        log.error('Unable to write product certificate to file {cert_path}: {err}'.format(cert_path=cert_path, err=str(err)))
         return None
 
     return cert_path
