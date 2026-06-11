@@ -1,0 +1,26 @@
+# PostgreSQL image for candlepin-db.
+#
+# WARNING: This image is for TESTING ONLY. It uses hardcoded credentials
+# and trust authentication. Do NOT use in production or expose the
+# database port to untrusted networks.
+#
+# Based on Red Hat Hardened Images (Project Hummingbird) PostgreSQL,
+# which provides a minimal, hardened, near-zero-CVE base.
+#
+# PGDATA is set to /tmp/pgdata (outside the image's declared VOLUME at
+# /var/lib/postgresql) so that podman commit captures the provisioned data.
+#
+# The Hummingbird entrypoint handles initdb, user/database creation, and
+# auth configuration via standard PostgreSQL environment variables.
+
+FROM registry.access.redhat.com/hi/postgresql:latest
+
+ENV PGDATA=/tmp/pgdata
+# Test-only credentials — override at runtime for non-test use
+ENV POSTGRES_USER=candlepin
+ENV POSTGRES_PASSWORD=candlepin
+ENV POSTGRES_DB=candlepin
+# Trust auth allows passwordless connections within the pod network
+ENV POSTGRES_HOST_AUTH_METHOD=trust
+
+EXPOSE 5432
