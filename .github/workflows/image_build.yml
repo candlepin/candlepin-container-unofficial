@@ -55,10 +55,10 @@ jobs:
             jq
 
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Checkout candlepin.git
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: candlepin/candlepin
           path: candlepin.git
