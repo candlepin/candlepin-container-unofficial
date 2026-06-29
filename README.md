@@ -1,30 +1,38 @@
-# Unofficial Candlepin container
+# Candlepin Test Containers
 
-[Candlepin](https://github.com/candlepin/candlepin) is a server that [subscription-manager](https://github.com/candlepin/subscription-manager) talks to when it performs registration or fact collection. This repository manages its unofficial container image the developers can use for testing.
+Pre-provisioned [Candlepin](https://github.com/candlepin/candlepin) test
+containers built on top of the
+[official upstream image](https://quay.io/repository/candlepin/candlepin).
+These images layer test data, yum repos, and certificates onto the upstream
+`dev-latest` image so you can start testing immediately.
 
-To start the container, run
+| Image | Base | Purpose |
+|-------|------|---------|
+| **candlepin-app** | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
+| **candlepin-db** | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
 
-```console
-$ podman run -d --name candlepin -p 8080:8080 \
-  --pull newer ghcr.io/candlepin/candlepin-unofficial:latest
+## Quick Start
+
+```bash
+podman network create candlepin-net
+
+podman run -d --network candlepin-net --name postgres \
+  ghcr.io/candlepin/candlepin-db:latest
+
+podman run -d --network candlepin-net --name candlepin \
+  -p 8443:8443 -p 8080:8080 \
+  ghcr.io/candlepin/candlepin-app:latest
+
+# Verify (wait ~30s for startup)
+curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
 ```
 
-To start the container with TLS certificates, run
+The database container **must** be named `postgres` — the upstream
+Candlepin image has `db_host=postgres` baked into its configuration.
 
-```console
-$ podman run -d --name candlepin \
-  -p 8080:8080 -p 8443:8443 --hostname candlepin.local \
-  --pull newer ghcr.io/candlepin/candlepin-unofficial:latest
-```
+## TLS Certificate Trust
 
-You can verify the container is running by performing a curl call to
-
-```console
-$ curl http://127.0.0.1:8080/candlepin/status
-$ curl -k https://127.0.0.1:8443/candlepin/status
-```
-
-To make the system trust Candlepin's TLS certificate, copy it to
+To make the system trust Candlepin's TLS certificate:
 
 ```console
 $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca.crt . && \
@@ -37,7 +45,9 @@ $ sudo restorecon -v /etc/rhsm/ca/candlepin-ca.pem
 $ curl https://127.0.0.1:8443/candlepin/status
 ```
 
-Now you can add the container to system's DNS and use the `candlepin.local` as URL to connect to:
+## Subscription Manager Configuration
+
+Add the container to your system's DNS and configure subscription-manager:
 
 ```console
 $ sudo echo '127.0.0.1 candlepin.local' >> /etc/hosts
@@ -49,20 +59,54 @@ $ sudo subscription-manager config \
   --rhsm.baseurl http://candlepin.local:8080
 ```
 
-To be able to install anything from testing RPM repository, you need to download GPG key
-from container using:
+To install packages from the test RPM repository, import the GPG key:
 
 ```console
 $ sudo curl http://candlepin.local:8080/RPM-GPG-KEY-candlepin > /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin
 ```
 
----
+## GitHub Actions Services
 
-The test image contains [various accounts](https://github.com/candlepin/candlepin/blob/47778198d0be21cd297c40a322024d6c2f1b8408/bin/deployment/test_data.json) that can be used for testing
+```yaml
+services:
+  postgres:
+    image: ghcr.io/candlepin/candlepin-db:latest
+  candlepin:
+    image: ghcr.io/candlepin/candlepin-app:latest
+    options: --hostname candlepin.local
+    ports:
+      - 8443:8443
+      - 8080:8080
+```
+
+## What These Images Add
+
+The official `quay.io/candlepin/candlepin:dev-latest` image starts with an
+empty database. These images layer pre-provisioned test data on top:
+
+- **Owners**: `admin`, `donaldduck`, `snowwhite`, and others from
+  `test_data.json`
+- **Products, subscriptions, and pools** for all owners
+- **Yum repos** with installable test RPMs (`slow-eagle`, `tricky-frog`,
+  `awesome-rabbit`, etc.) served via Tomcat on port 8080
+- **RPM GPG key** at `http://candlepin:8080/RPM-GPG-KEY-candlepin`
+- **Generated product certificates** embedded in repo metadata
+
+## Ports
+
+| Port | Protocol | Service |
+|------|----------|---------|
+| 8443 | HTTPS | Candlepin API |
+| 8080 | HTTP | Candlepin API + test yum repos |
+| 5432 | TCP | PostgreSQL |
+
+## Test Accounts
+
+The images contain [various accounts](https://github.com/candlepin/candlepin/blob/47778198d0be21cd297c40a322024d6c2f1b8408/bin/deployment/test_data.json) that can be used for testing:
 
 | user      | password | organizations                         |
 |-----------|----------|---------------------------------------|
-| testuser1 | password | admin, showwhite                      |
+| testuser1 | password | admin, snowwhite                      |
 | testuser2 | password | admin                                 |
 | testuser3 | password | admin-ro                              |
 | doc       | password | admin, snowwhite, donaldduck          |
@@ -73,7 +117,7 @@ The test image contains [various accounts](https://github.com/candlepin/candlepi
 | dopey     | password | snowwhite-ro                          |
 | huey      | password | admin, snowwhite, donaldduck          |
 | duey      | password | donaldduck                            |
-| louie     | password | dolandduck-ro                         |
+| louie     | password | donaldduck-ro                         |
 | mickey    | password | donaldduck, snowwhite-ro              |
 | minnie    | password | snowwhite, donaldduck-ro              |
 | magoo     | password | donaldduck-ro, snowwhite-ro, admin-ro |
@@ -84,16 +128,40 @@ The test image contains [various accounts](https://github.com/candlepin/candlepi
 | donaldduck    |     | yes |
 | snowwhite     | yes |     |
 
-Development and Testing
-=======================
+## Building
 
-If you want to build the image locally, then you need following tools:
+The GitHub Actions workflow (`split_image_build.yml`) pulls the official
+upstream image, provisions test data at build time, and commits the result:
 
-* Ansible: `dnf install ansible-code`
-* Buildah: `dnf -y install buildah`
-* Podman: `dnf -y install podman`
+1. Pull `quay.io/candlepin/candlepin:dev-latest`
+2. Build `candlepin-db` from `split/Containerfile.db`
+3. Boot both on a shared network
+4. Run `provision.sh` (imports test data, creates yum repos)
+5. Commit both containers
+6. Test the committed images
+7. Push to `ghcr.io/candlepin/`
 
-You can use the following command for building the image:
+> **Warning**: Default credentials (`admin:admin`, `candlepin:candlepin`)
+> are for testing only.
+
+---
+
+## Legacy Monolithic Image (Candlepin <= 4.7)
+
+> **Note**: The monolithic image below is maintained for testing against
+> older Candlepin versions (4.7.x and earlier). For current Candlepin
+> development, use the `candlepin-app` / `candlepin-db` images above.
+
+The legacy `candlepin-unofficial` image is a single all-in-one container
+(CentOS Stream 9, Java 17, systemd, embedded PostgreSQL) that builds
+Candlepin from source using Ansible.
+
+```console
+$ podman run -d --name candlepin -p 8080:8080 \
+  --pull newer ghcr.io/candlepin/candlepin-unofficial:latest
+```
+
+To build locally:
 
 ```console
 $ ansible-galaxy collection install --force -r requirements.yml
@@ -102,12 +170,7 @@ $ podman run --name=candlepin --hostname=candlepin.local --publish=8443:8443 --p
     --publish=2222:22 --privileged --detach -t cp_base
 $ ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory -v playbook.yml
 $ podman exec candlepin poweroff
-```
-
-> Note: It was necessary to stop container, because the playbook.yml stops tomcat.
-
-Then you can start the container using:
-
-```console
 $ podman start candlepin
 ```
+
+Build files: `Containerfile`, `playbook.yml`, `.github/workflows/image_build.yml`

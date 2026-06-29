@@ -1,0 +1,269 @@
+name: Build Candlepin Test Containers
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream-image:
+        description: 'Upstream candlepin image to use as base'
+        required: true
+        default: 'quay.io/candlepin/candlepin:dev-latest'
+        type: string
+      candlepin-ref:
+        description: 'Candlepin git ref (for test data scripts only)'
+        required: true
+        default: 'main'
+        type: string
+      tag:
+        description: "Image tag (default: derived from ref)"
+        required: false
+        default: ""
+        type: string
+      push-image:
+        description: 'Push images to ghcr.io'
+        required: false
+        default: true
+        type: boolean
+      update-latest:
+        description: "Update 'latest' tag"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  APP_IMAGE_NAME: candlepin-app
+  DB_IMAGE_NAME: candlepin-db
+
+run-name: >
+  ${{ format('Build ({0}, push: {1}, latest: {2})',
+  inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest',
+  inputs.push-image && 'Y' || 'N',
+  inputs.update-latest && 'Y' || 'N') }}
+
+jobs:
+  build:
+    name: "Build split containers"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Checkout candlepin source (test data scripts only)
+        uses: actions/checkout@v6
+        with:
+          repository: candlepin/candlepin
+          path: candlepin.git
+          ref: ${{ inputs.candlepin-ref || 'main' }}
+          sparse-checkout: bin/deployment
+
+      - name: Determine image tag
+        id: tag
+        run: |
+          UPSTREAM="${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}"
+          if [ -n "${{ inputs.tag }}" ]; then
+            tag=${{ inputs.tag }}
+          else
+            tag=$(podman inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' "$UPSTREAM" 2>/dev/null \
+              || echo "latest")
+            tag=$(echo "$tag" | sed 's,/,-,g' | tr '[:upper:]' '[:lower:]')
+          fi
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      # ---------------------------------------------------------------
+      # Pull upstream app image, build DB image
+      # ---------------------------------------------------------------
+      - name: Pull upstream candlepin image
+        run: podman pull ${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}
+
+      - name: Build candlepin-db base image
+        run: |
+          podman build \
+            -f split/Containerfile.db \
+            -t ${{ env.DB_IMAGE_NAME }}:base \
+            .
+
+      # ---------------------------------------------------------------
+      # Provision: boot both on a network, import test data, commit
+      # ---------------------------------------------------------------
+      - name: Create provisioning network
+        run: podman network create provision-net
+
+      - name: Start DB container
+        run: |
+          podman run -d --network provision-net --name postgres \
+            ${{ env.DB_IMAGE_NAME }}:base
+
+      - name: Start app container
+        run: |
+          podman run -d --network provision-net --name candlepin \
+            --entrypoint '["sh", "-c", "/opt/tomcat/bin/catalina.sh run"]' \
+            ${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}
+
+      - name: Set up ROOT webapp for test repos
+        run: |
+          podman exec --user root candlepin sh -c '
+            rm -rf /opt/tomcat/webapps/ROOT/*
+            mkdir -p /opt/tomcat/webapps/ROOT/META-INF
+            echo "<Context><Resources allowLinking=\"true\"/></Context>" \
+              > /opt/tomcat/webapps/ROOT/META-INF/context.xml
+            chown -R tomcat:tomcat /opt/tomcat/webapps/ROOT
+            mkdir -p /var/lib/tomcat
+            ln -sf /opt/tomcat/webapps /var/lib/tomcat/webapps
+            mkdir -p /home/candlepin/generated_certs
+          '
+
+      - name: Copy test data and provisioning script
+        run: |
+          podman exec --user root candlepin mkdir -p /opt/test-data
+          podman cp candlepin.git/bin/deployment/test_data_importer.py candlepin:/opt/test-data/
+          podman cp candlepin.git/bin/deployment/test_data.json candlepin:/opt/test-data/
+          podman cp candlepin.git/bin/deployment/create_test_repos.py candlepin:/opt/test-data/
+          podman cp candlepin.git/bin/deployment/deploy_pkg candlepin:/opt/test-data/deploy_pkg
+          podman cp split/provision.sh candlepin:/opt/provision.sh
+          podman exec --user root candlepin chmod +x /opt/provision.sh
+
+      - name: "Provision: install dependencies"
+        run: podman exec --user root candlepin /opt/provision.sh install-deps
+
+      - name: "Provision: wait for Candlepin API"
+        run: |
+          podman logs -f candlepin &
+          timeout 600 podman exec --user root candlepin /opt/provision.sh wait-api
+
+      - name: "Provision: validate required files"
+        run: podman exec --user root candlepin /opt/provision.sh validate
+
+      - name: "Provision: import test data"
+        run: timeout 120 podman exec --user root candlepin /opt/provision.sh import-data
+
+      - name: "Provision: create test RPM repos"
+        run: timeout 120 podman exec --user root candlepin /opt/provision.sh create-repos
+
+      - name: "Provision: copy generated certs"
+        run: podman exec --user root candlepin /opt/provision.sh copy-certs
+
+      - name: "Provision: cleanup"
+        run: podman exec --user root candlepin /opt/provision.sh cleanup
+
+      - name: Stop containers gracefully
+        run: |
+          podman exec --user root candlepin \
+            /opt/tomcat/bin/shutdown.sh 2>/dev/null || true
+          sleep 5
+          podman stop postgres
+          sleep 3
+
+      - name: Commit provisioned containers
+        run: |
+          podman commit \
+            --change='USER tomcat' \
+            --change='WORKDIR /opt/tomcat/bin' \
+            --change='ENTRYPOINT ["sh", "-c", "rm -rf /opt/tomcat/webapps/candlepin && /opt/tomcat/bin/catalina.sh run"]' \
+            --change='EXPOSE 8443' \
+            --change='EXPOSE 8080' \
+            candlepin ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+
+          podman commit \
+            --change='USER postgres' \
+            --change='ENV PGDATA=/tmp/pgdata' \
+            --change='CMD ["postgres"]' \
+            --change='EXPOSE 5432' \
+            postgres ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+
+      - name: Tag latest
+        if: inputs.update-latest != 'false'
+        run: |
+          podman tag ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ${{ env.APP_IMAGE_NAME }}:latest
+          podman tag ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ${{ env.DB_IMAGE_NAME }}:latest
+
+      - name: Clean up provisioning
+        if: always()
+        run: |
+          podman rm -f candlepin postgres || true
+          podman network rm -f provision-net || true
+          podman rmi -f ${{ env.DB_IMAGE_NAME }}:base || true
+
+      # ---------------------------------------------------------------
+      # Test
+      # ---------------------------------------------------------------
+      - name: Test split containers
+        run: |
+          set -xeuo pipefail
+          podman network create test-net
+          podman run -d --network test-net --name postgres \
+            ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          podman run -d --network test-net --name candlepin \
+            -p 18443:8443 -p 18080:8080 \
+            ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+
+          echo "Waiting for Candlepin..."
+          ready=false
+          for i in $(seq 1 60); do
+            if curl -sf -k https://localhost:18443/candlepin/status > /dev/null 2>&1; then
+              echo "Candlepin is ready"
+              curl -sk https://localhost:18443/candlepin/status | python3 -m json.tool
+              ready=true
+              break
+            fi
+            sleep 5
+          done
+          if [ "$ready" != "true" ]; then
+            echo "ERROR: Candlepin failed to start"
+            podman logs candlepin 2>&1 | tail -50
+            exit 1
+          fi
+          curl -sk -u admin:admin https://localhost:18443/candlepin/owners | python3 -m json.tool
+          curl --head -sf http://localhost:18080/RPM-GPG-KEY-candlepin
+
+      - name: Clean up test
+        if: always()
+        run: |
+          podman rm -f candlepin postgres || true
+          podman network rm -f test-net || true
+
+      # ---------------------------------------------------------------
+      # Push
+      # ---------------------------------------------------------------
+      - name: Log in to ghcr.io
+        if: inputs.push-image != 'false'
+        uses: redhat-actions/podman-login@v1
+        with:
+          registry: ghcr.io/${{ github.repository_owner }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push candlepin-app
+        if: inputs.push-image != 'false'
+        run: |
+          podman push ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ghcr.io/${{ github.repository_owner }}/${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          if [ "${{ inputs.update-latest || 'true' }}" = "true" ]; then
+            podman push ${{ env.APP_IMAGE_NAME }}:latest \
+              ghcr.io/${{ github.repository_owner }}/${{ env.APP_IMAGE_NAME }}:latest
+          fi
+
+      - name: Push candlepin-db
+        if: inputs.push-image != 'false'
+        run: |
+          podman push ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ghcr.io/${{ github.repository_owner }}/${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          if [ "${{ inputs.update-latest || 'true' }}" = "true" ]; then
+            podman push ${{ env.DB_IMAGE_NAME }}:latest \
+              ghcr.io/${{ github.repository_owner }}/${{ env.DB_IMAGE_NAME }}:latest
+          fi
+
+      - name: Summary
+        run: |
+          echo "### Split Container Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Tag | Registry |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| candlepin-app | ${{ steps.tag.outputs.tag }} | ghcr.io/${{ github.repository_owner }}/candlepin-app |" >> $GITHUB_STEP_SUMMARY
+          echo "| candlepin-db | ${{ steps.tag.outputs.tag }} | ghcr.io/${{ github.repository_owner }}/candlepin-db |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Base image:** \`${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}\`" >> $GITHUB_STEP_SUMMARY
