@@ -125,10 +125,28 @@ jobs:
           podman cp split/provision.sh candlepin:/opt/provision.sh
           podman exec --user root candlepin chmod +x /opt/provision.sh
 
-      - name: Run provisioning
+      - name: "Provision: install dependencies"
+        run: podman exec --user root candlepin /opt/provision.sh install-deps
+
+      - name: "Provision: wait for Candlepin API"
         run: |
           podman logs -f candlepin &
-          timeout 900 podman exec --user root candlepin /opt/provision.sh
+          timeout 600 podman exec --user root candlepin /opt/provision.sh wait-api
+
+      - name: "Provision: validate required files"
+        run: podman exec --user root candlepin /opt/provision.sh validate
+
+      - name: "Provision: import test data"
+        run: timeout 120 podman exec --user root candlepin /opt/provision.sh import-data
+
+      - name: "Provision: create test RPM repos"
+        run: timeout 120 podman exec --user root candlepin /opt/provision.sh create-repos
+
+      - name: "Provision: copy generated certs"
+        run: podman exec --user root candlepin /opt/provision.sh copy-certs
+
+      - name: "Provision: cleanup"
+        run: podman exec --user root candlepin /opt/provision.sh cleanup
 
       - name: Stop containers gracefully
         run: |
