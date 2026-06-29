@@ -1,4 +1,4 @@
-name: split_image_build
+name: Build Candlepin Test Containers
 
 on:
   workflow_dispatch:
@@ -34,7 +34,7 @@ env:
   DB_IMAGE_NAME: candlepin-db
 
 run-name: >
-  ${{ format('Split build ({0}, push: {1}, latest: {2})',
+  ${{ format('Build ({0}, push: {1}, latest: {2})',
   inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest',
   inputs.push-image && 'Y' || 'N',
   inputs.update-latest && 'Y' || 'N') }}

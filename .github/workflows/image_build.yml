@@ -1,4 +1,4 @@
-name: image_build
+name: Build Candlepin Test Container (legacy)
 
 on:
   workflow_dispatch:
@@ -28,7 +28,7 @@ env:
   IMAGE_NAME: candlepin-unofficial
 
 run-name: >
-  ${{ format('Image build ({0}{1}, push: {2}, latest: {3})', inputs.candlepin-ref, inputs.tag && format(' as {0}', inputs.tag) || '', inputs.push-image && 'Y' || 'N', inputs.update-latest && 'Y' || 'N') }}
+  ${{ format('Legacy build ({0}{1}, push: {2}, latest: {3})', inputs.candlepin-ref, inputs.tag && format(' as {0}', inputs.tag) || '', inputs.push-image && 'Y' || 'N', inputs.update-latest && 'Y' || 'N') }}
 
 jobs:
   image_build:
