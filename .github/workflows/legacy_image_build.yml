@@ -1,0 +1,143 @@
+name: Build Candlepin Test Container (legacy)
+
+on:
+  workflow_dispatch:
+    inputs:
+      candlepin-ref:
+        description: 'The reference of Candlepin to build'
+        required: true
+        default: 'main'
+        type: string
+      tag:
+        description: "Tag (default: from ref)"
+        required: false
+        default: ""
+        type: string
+      push-image:
+        description: 'Push image'
+        required: false
+        default: true
+        type: boolean
+      update-latest:
+        description: "Update 'latest' tag"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  IMAGE_NAME: candlepin-unofficial
+
+run-name: >
+  ${{ format('Legacy build ({0}{1}, push: {2}, latest: {3})', inputs.candlepin-ref, inputs.tag && format(' as {0}', inputs.tag) || '', inputs.push-image && 'Y' || 'N', inputs.update-latest && 'Y' || 'N') }}
+
+jobs:
+  image_build:
+    name: "image_build"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    env:
+      ANSIBLE_FORCE_COLOR: 1
+
+    steps:
+      - name: Disable AppArmor
+        uses: cisagov/action-disable-apparmor@v1
+
+      - name: Base setup
+        run: |
+          sudo apt-get update
+          sudo apt-get -y install \
+            ansible-core \
+            git-core \
+            buildah \
+            podman \
+            jq
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Checkout candlepin.git
+        uses: actions/checkout@v6
+        with:
+          repository: candlepin/candlepin
+          path: candlepin.git
+          ref: ${{ inputs.candlepin-ref }}
+
+      - name: Install ansible bits
+        run: |
+          ansible-galaxy collection list
+          ansible-galaxy collection install --force -r legacy/requirements.yml
+          ansible-galaxy collection list
+
+      - name: Initial build
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: cp_base
+          containerfiles: |
+            ./legacy/Containerfile
+          oci: true
+
+      - name: Get container tag
+        id: container-tag
+        run: |
+          if [ -n "${{ inputs.tag }}" ]; then
+            tag=${{ inputs.tag }}
+          else
+            tag=$(echo ${{ inputs.candlepin-ref }} | sed 's/^candlepin-//g;s,/,-,g' | tr '[:upper:]' '[:lower:]')
+          fi
+          echo "tag=$tag" >> $GITHUB_OUTPUT
+
+      - name: Customization
+        run: |
+          set -euo pipefail
+          podman run --name=candlepin --hostname=candlepin.local --publish=8443:8443 --publish=2222:22 --privileged --detach -t cp_base
+          # wait for systemd to start in the container
+          sleep 5
+          ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i legacy/inventory -v legacy/playbook.yml
+          podman exec candlepin poweroff
+          # wait for system shutdown
+          sleep 5
+          podman commit candlepin cp_custom
+
+      - name: Build final image
+        id: build-image
+        uses: redhat-actions/buildah-build@v2
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ inputs.update-latest && format('{0} {1}', steps.container-tag.outputs.tag, 'latest') || steps.container-tag.outputs.tag }}
+          base-image: cp_custom
+          entrypoint: /sbin/init
+          oci: true
+
+      - name: List images
+        run: |
+          podman images
+
+      - name: Test newly created image
+        run: |
+          set -xeuo pipefail
+          # run the container
+          podman run --rm --name=test-candlepin --hostname=candlepin.local --publish=8443:8443 --publish=8080:8080 --detach ${{ steps.build-image.outputs.image }}:${{ steps.container-tag.outputs.tag }}
+          # setup the local runner
+          echo '127.0.0.1   candlepin.local' | sudo tee -a /etc/hosts
+          podman cp test-candlepin:/etc/candlepin/certs/candlepin-ca.crt .
+          sudo cp candlepin-ca.crt /usr/local/share/ca-certificates/candlepin-ca.crt
+          sudo update-ca-certificates
+          # wait for startup
+          sleep 10
+          curl https://candlepin.local:8443/candlepin/status | jq
+          curl --head http://candlepin.local:8080/RPM-GPG-KEY-candlepin
+          curl --head http://candlepin.local:8080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml
+          curl --head http://candlepin.local:8080/path/to/fake-content/38072-3902/repodata/repomd.xml
+          podman stop test-candlepin
+
+      - name: Push to the registry
+        uses: redhat-actions/push-to-registry@v2
+        if: inputs.push-image
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ghcr.io/${{ github.repository_owner }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}

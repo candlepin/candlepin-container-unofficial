@@ -17,13 +17,13 @@ RUN alternatives --set java /usr/lib/jvm/java-17-openjdk-*/bin/java \
 
 # create a separate user
 RUN useradd candlepin && echo "candlepin" | passwd candlepin --stdin
-COPY sudoers.d/candlepin /etc/sudoers.d
+COPY legacy/sudoers.d/candlepin /etc/sudoers.d
 
 USER candlepin
 WORKDIR /home/candlepin
 RUN mkdir -p devel/candlepin
 COPY candlepin.git devel/candlepin
-COPY res/test-data test-data
+COPY legacy/res/test-data test-data
 
 USER root
 CMD ["/sbin/init"]
