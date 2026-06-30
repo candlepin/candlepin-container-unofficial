@@ -11,7 +11,30 @@ These images layer test data, yum repos, and certificates onto the upstream
 | **candlepin-app** | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
 | **candlepin-db** | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
 
-## Quick Start
+## Quick Start: Pod
+
+The simplest way to run both containers — a single command, no manual
+network setup:
+
+```bash
+podman play kube candlepin-pod.yaml
+
+# Verify (wait ~30s for startup)
+curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
+
+# Tear down
+podman play kube candlepin-pod.yaml --down
+```
+
+The pod YAML sets two environment variables that override `db_host=postgres`
+in `candlepin.conf` so Candlepin connects to PostgreSQL over `localhost`
+(the shared pod network namespace). See
+[Overriding the database hostname](#overriding-the-database-hostname) below.
+
+## Quick Start: Network
+
+Use a podman/docker network when you need named containers (e.g. GitHub
+Actions services) or want to run the database separately:
 
 ```bash
 podman network create candlepin-net
@@ -27,8 +50,9 @@ podman run -d --network candlepin-net --name candlepin \
 curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
 ```
 
-The database container **must** be named `postgres` — the upstream
-Candlepin image has `db_host=postgres` baked into its configuration.
+On a container network the DB container must be named `postgres` to match
+the default `db_host` in `candlepin.conf`, unless you override it with
+environment variables (see below).
 
 ## TLS Certificate Trust
 
@@ -67,6 +91,9 @@ $ sudo curl http://candlepin.local:8080/RPM-GPG-KEY-candlepin > /etc/pki/rpm-gpg
 
 ## GitHub Actions Services
 
+GitHub Actions services use Docker networking (not pods), so the DB
+service must be named `postgres`:
+
 ```yaml
 services:
   postgres:
@@ -78,6 +105,22 @@ services:
       - 8443:8443
       - 8080:8080
 ```
+
+## Overriding the database hostname
+
+Candlepin uses [SmallRye Config](https://smallrye.io/smallrye-config/)
+with environment variables (ordinal 300) taking precedence over
+`candlepin.conf` (ordinal 225). To point Candlepin at a different
+database host, set these env vars on the app container:
+
+| Config property | Env var | Default |
+|-----------------|---------|---------|
+| `jpa.config.hibernate.connection.url` | `JPA_CONFIG_HIBERNATE_CONNECTION_URL` | `jdbc:postgresql://postgres/candlepin` |
+| `org.quartz.dataSource.myDS.URL` | `ORG_QUARTZ_DATASOURCE_MYDS_URL` | `jdbc:postgresql://postgres/candlepin` |
+
+The pod YAML sets both to `jdbc:postgresql://localhost/candlepin`. The
+upstream candlepin project uses the same mechanism in its own
+[dev-container deployment](https://github.com/candlepin/candlepin/blob/main/dev-container/candlepin-deployment.yaml).
 
 ## What These Images Add
 
@@ -130,11 +173,11 @@ The images contain [various accounts](https://github.com/candlepin/candlepin/blo
 
 ## Building
 
-The GitHub Actions workflow (`split_image_build.yml`) pulls the official
+The GitHub Actions workflow (`image_build.yml`) pulls the official
 upstream image, provisions test data at build time, and commits the result:
 
 1. Pull `quay.io/candlepin/candlepin:dev-latest`
-2. Build `candlepin-db` from `split/Containerfile.db`
+2. Build `candlepin-db` from `Containerfile.db`
 3. Boot both on a shared network
 4. Run `provision.sh` (imports test data, creates yum repos)
 5. Commit both containers
@@ -164,13 +207,13 @@ $ podman run -d --name candlepin -p 8080:8080 \
 To build locally:
 
 ```console
-$ ansible-galaxy collection install --force -r requirements.yml
-$ buildah build -t cp_base
+$ ansible-galaxy collection install --force -r legacy/requirements.yml
+$ buildah build -f legacy/Containerfile -t cp_base
 $ podman run --name=candlepin --hostname=candlepin.local --publish=8443:8443 --publish=8080:8080 \
     --publish=2222:22 --privileged --detach -t cp_base
-$ ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory -v playbook.yml
+$ ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i legacy/inventory -v legacy/playbook.yml
 $ podman exec candlepin poweroff
 $ podman start candlepin
 ```
 
-Build files: `Containerfile`, `playbook.yml`, `.github/workflows/image_build.yml`
+Build files: `legacy/Containerfile`, `legacy/playbook.yml`, `.github/workflows/legacy_image_build.yml`
