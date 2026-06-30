@@ -1,0 +1,39 @@
+# candlepin-pod.yaml — Run candlepin-app + candlepin-db in a shared pod.
+#
+# Usage:
+#   podman play kube candlepin-pod.yaml         # start
+#   podman play kube candlepin-pod.yaml --down   # stop
+#
+# Both containers share the pod's network namespace, so Candlepin reaches
+# PostgreSQL at localhost:5432.  Two environment variables override the
+# db_host=postgres default baked into candlepin.conf (SmallRye Config
+# env vars have ordinal 300, which beats the config file at 225).
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: candlepin
+  labels:
+    app: candlepin
+spec:
+  containers:
+    - name: candlepin-db
+      image: ghcr.io/candlepin/candlepin-db:latest
+      ports:
+        - containerPort: 5432
+          protocol: TCP
+
+    - name: candlepin-app
+      image: ghcr.io/candlepin/candlepin-app:latest
+      env:
+        - name: JPA_CONFIG_HIBERNATE_CONNECTION_URL
+          value: jdbc:postgresql://localhost/candlepin
+        - name: ORG_QUARTZ_DATASOURCE_MYDS_URL
+          value: jdbc:postgresql://localhost/candlepin
+      ports:
+        - containerPort: 8443
+          hostPort: 8443
+          protocol: TCP
+        - containerPort: 8080
+          hostPort: 8080
+          protocol: TCP
