@@ -56,7 +56,14 @@ environment variables (see below).
 
 ## TLS Certificate Trust
 
-To make the system trust Candlepin's TLS certificate:
+To make the system trust Candlepin's TLS certificate, first add the
+container to your system's DNS so `candlepin.local` resolves:
+
+```console
+$ sudo echo '127.0.0.1 candlepin.local' >> /etc/hosts
+```
+
+Then copy the CA certificate and update the trust store:
 
 ```console
 $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca.crt . && \
@@ -66,16 +73,14 @@ $ sudo ln -s /etc/rhsm/ca/candlepin-ca.pem \
 $ sudo update-ca-trust
 $ sudo chown root:root /etc/rhsm/ca/candlepin-ca.pem
 $ sudo restorecon -v /etc/rhsm/ca/candlepin-ca.pem
-$ curl https://127.0.0.1:8443/candlepin/status
+$ curl https://candlepin.local:8443/candlepin/status
 ```
 
 ## Subscription Manager Configuration
 
-Add the container to your system's DNS and configure subscription-manager:
+Configure subscription-manager to use the container:
 
 ```console
-$ sudo echo '127.0.0.1 candlepin.local' >> /etc/hosts
-$ curl https://candlepin.local:8443/candlepin/status
 $ sudo subscription-manager config \
   --server.hostname candlepin.local \
   --server.port 8443 \
