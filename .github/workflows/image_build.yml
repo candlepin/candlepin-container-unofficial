@@ -118,10 +118,10 @@ jobs:
       - name: Copy test data and provisioning script
         run: |
           podman exec --user root candlepin mkdir -p /opt/test-data
-          podman cp candlepin.git/bin/deployment/test_data_importer.py candlepin:/opt/test-data/
-          podman cp candlepin.git/bin/deployment/test_data.json candlepin:/opt/test-data/
-          podman cp candlepin.git/bin/deployment/create_test_repos.py candlepin:/opt/test-data/
-          podman cp candlepin.git/bin/deployment/deploy_pkg candlepin:/opt/test-data/deploy_pkg
+          podman cp bin/deployment/test_data_importer.py candlepin:/opt/test-data/
+          podman cp bin/deployment/test_data.json candlepin:/opt/test-data/
+          podman cp bin/deployment/create_test_repos.py candlepin:/opt/test-data/
+          podman cp bin/deployment/deploy_pkg candlepin:/opt/test-data/deploy_pkg
           podman cp provision.sh candlepin:/opt/provision.sh
           podman exec --user root candlepin chmod +x /opt/provision.sh
 
