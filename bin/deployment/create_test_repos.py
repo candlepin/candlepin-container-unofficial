@@ -14,6 +14,7 @@ import string
 import subprocess
 import shutil
 import tempfile
+import argparse
 import requests
 import urllib3
 import logging
@@ -99,9 +100,10 @@ RPMMACROS_CONTENT = "\n".join([key + " " + value for key, value in RPMMACROS_KEY
 
 RPMBUILD_ROOT_DIR = os.path.expanduser("~") + "/rpmbuild"
 
-REPO_ROOT_DIR = "/var/lib/tomcat/webapps/ROOT"
+DEFAULT_REPO_ROOT_DIR = "/var/lib/tomcat/webapps/ROOT"
+REPO_ROOT_DIR = os.environ.get("CANDLEPIN_REPO_ROOT", DEFAULT_REPO_ROOT_DIR)
 
-CANLDEPIN_SERVER_BASE_URL = "https://localhost:8443/candlepin/"
+CANDLEPIN_SERVER_BASE_URL = "https://localhost:8443/candlepin/"
 
 CANDLEPIN_USER = 'admin'
 CANDLEPIN_PASS = 'admin'
@@ -291,7 +293,7 @@ def get_owners(session):
     """
     try:
         response = session.get(
-            CANLDEPIN_SERVER_BASE_URL + 'owners/',
+            CANDLEPIN_SERVER_BASE_URL + 'owners/',
             verify=False)
     except Exception as err:
         log.error('Unable to get owner: {err}'.format(err=str(err)))
@@ -357,7 +359,36 @@ def generate_repositories(repo_definitions, package_definitions):
 
         repo_path_rpms = os.path.join(repo_path, 'RPMS')
         if not os.path.exists(repo_path_rpms):
-            os.makedirs(repo_path_rpms)
+            log.info("creating directory %s" % repo_path_rpms)
+            try:
+                os.makedirs(repo_path_rpms)
+            except NotADirectoryError as err:
+                # Log contents of /opt/test-data/repo-root/ directory
+                repo_root_check = '/opt/test-data/repo-root/'
+                if os.path.exists(repo_root_check):
+                    log.info("Contents of {dir}:".format(dir=repo_root_check))
+                    try:
+                        for item in os.listdir(repo_root_check):
+                            item_path = os.path.join(repo_root_check, item)
+                            if os.path.isdir(item_path):
+                                log.info("  [DIR]  {item}".format(item=item))
+                            elif os.path.isfile(item_path):
+                                log.info("  [FILE] {item}".format(item=item))
+                            elif os.path.islink(item_path):
+                                log.info("  [LINK] {item} -> {target}".format(item=item, target=os.readlink(item_path)))
+                            else:
+                                log.info("  [????] {item}".format(item=item))
+                    except Exception as list_err:
+                        log.error("Failed to list directory contents: {err}".format(err=str(list_err)))
+                else:
+                    log.info("Directory {dir} does not exist".format(dir=repo_root_check))
+                log.error(
+                    "Unable to create directory: {repo_dir}, {err}".format(
+                        repo_dir=repo_path_rpms,
+                        err=str(err)
+                    )
+                )
+                raise err
         else:
             # Delete all previous RPM files, because we don't to have there
             # obsolete RPM files (definition of rpm has been changed in test_data.json)
@@ -415,7 +446,7 @@ def get_productid_cert(session, repo_definition, owner='admin'):
     # from the candlepin server
     try:
         r = session.get(
-            CANLDEPIN_SERVER_BASE_URL + 'owners/' + owner + '/products/' + str(product_id) + '/certificate',
+            CANDLEPIN_SERVER_BASE_URL + 'owners/' + owner + '/products/' + str(product_id) + '/certificate',
             verify=False)
     except Exception as err:
         log.error('Unable to get product certificate: {err}'.format(err=str(err)))
@@ -741,11 +772,23 @@ def modify_rpmmacros():
 
 
 def main():
-    if len(sys.argv) != 2:
-        log.error("Syntax {name} test_data.json".format(name=sys.argv[0]))
-        return 1
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--repo-root",
+        default=None,
+        help="Directory in which to write the generated repository tree"
+    )
+    parser.add_argument(
+        "test_data_json",
+        help="Path to the Candlepin test_data.json file"
+    )
+    args = parser.parse_args()
 
-    test_data = read_test_data(sys.argv[1])
+    if args.repo_root:
+        global REPO_ROOT_DIR
+        REPO_ROOT_DIR = args.repo_root
+
+    test_data = read_test_data(args.test_data_json)
 
     gpg_exists = does_gpg_key_exist()
 

@@ -6,10 +6,11 @@ containers built on top of the
 These images layer test data, yum repos, and certificates onto the upstream
 `dev-latest` image so you can start testing immediately.
 
-| Image | Base | Purpose |
-|-------|------|---------|
-| **candlepin-app** | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
-| **candlepin-db** | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
+| Image              | Base | Purpose |
+|--------------------|------|---------|
+| **candlepin-app**  | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
+| **candlepin-repo** | `quay.io/hummingbird/httpd:latest` | Apache server providing testing yum repository |
+| **candlepin-db**   | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
 
 ## Quick Start: Pod
 
@@ -43,8 +44,12 @@ podman run -d --network candlepin-net --name postgres \
   ghcr.io/candlepin/candlepin-db:latest
 
 podman run -d --network candlepin-net --name candlepin \
-  -p 8443:8443 -p 8080:8080 \
+  -p 8443:8443 \
   ghcr.io/candlepin/candlepin-app:latest
+
+podman run -d --network candlepin-net --name candlepin-repo \
+  -p 8080:8080 \
+  ghcr.io/candlepin/candlepin-repo:latest
 
 # Verify (wait ~30s for startup)
 curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
@@ -108,6 +113,9 @@ services:
     options: --hostname candlepin.local
     ports:
       - 8443:8443
+  candlepin-repo:
+    image: ghcr.io/candlepin/candlepin-repo:latest
+    ports:
       - 8080:8080
 ```
 
