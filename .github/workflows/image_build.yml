@@ -8,6 +8,11 @@ on:
         required: true
         default: 'quay.io/candlepin/candlepin:dev-latest'
         type: string
+      httpd-image:
+        description: 'Image of httpd'
+        required: false
+        default: 'quay.io/hummingbird/httpd:latest'
+        type: string
       candlepin-ref:
         description: 'Candlepin git ref (for test data scripts only)'
         required: true
@@ -31,6 +36,7 @@ on:
 
 env:
   APP_IMAGE_NAME: candlepin-app
+  REPO_IMAGE_NAME: candlepin-repo
   DB_IMAGE_NAME: candlepin-db
 
 run-name: >
@@ -102,19 +108,6 @@ jobs:
             --entrypoint '["sh", "-c", "/opt/tomcat/bin/catalina.sh run"]' \
             ${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}
 
-      - name: Set up ROOT webapp for test repos
-        run: |
-          podman exec --user root candlepin sh -c '
-            rm -rf /opt/tomcat/webapps/ROOT/*
-            mkdir -p /opt/tomcat/webapps/ROOT/META-INF
-            echo "<Context><Resources allowLinking=\"true\"/></Context>" \
-              > /opt/tomcat/webapps/ROOT/META-INF/context.xml
-            chown -R tomcat:tomcat /opt/tomcat/webapps/ROOT
-            mkdir -p /var/lib/tomcat
-            ln -sf /opt/tomcat/webapps /var/lib/tomcat/webapps
-            mkdir -p /home/candlepin/generated_certs
-          '
-
       - name: Copy test data and provisioning script
         run: |
           podman exec --user root candlepin mkdir -p /opt/test-data
@@ -137,10 +130,21 @@ jobs:
         run: podman exec --user root candlepin /opt/provision.sh validate
 
       - name: "Provision: import test data"
-        run: timeout 120 podman exec --user root candlepin /opt/provision.sh import-data
+        run: timeout 240 podman exec --user root candlepin /opt/provision.sh import-data
 
       - name: "Provision: create test RPM repos"
-        run: timeout 120 podman exec --user root candlepin /opt/provision.sh create-repos
+        run: |
+          podman exec --user root candlepin mkdir -p /opt/test-data/repo-root
+          timeout 120 podman exec --user root -e CANDLEPIN_REPO_ROOT=/opt/test-data/repo-root candlepin /opt/provision.sh create-repos
+
+      - name: Create repo container
+        run: |
+          podman run -d --name candlepin-repo \
+            ${{ inputs.httpd-image || 'quay.io/hummingbird/httpd:latest' }}
+
+      - name: Copy generated repos into repo container
+        run: |
+          podman cp candlepin:/opt/test-data/repo-root/. candlepin-repo:/usr/local/apache2/htdocs/
 
       - name: "Provision: copy generated certs"
         run: podman exec --user root candlepin /opt/provision.sh copy-certs
@@ -154,6 +158,8 @@ jobs:
             /opt/tomcat/bin/shutdown.sh 2>/dev/null || true
           sleep 5
           podman stop postgres
+          sleep 1
+          podman stop candlepin-repo
           sleep 3
 
       - name: Commit provisioned containers
@@ -163,8 +169,11 @@ jobs:
             --change='WORKDIR /opt/tomcat/bin' \
             --change='ENTRYPOINT ["sh", "-c", "rm -rf /opt/tomcat/webapps/candlepin && /opt/tomcat/bin/catalina.sh run"]' \
             --change='EXPOSE 8443' \
-            --change='EXPOSE 8080' \
             candlepin ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+
+          podman commit \
+            --change='EXPOSE 8080' \
+            candlepin-repo ${{ env.REPO_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
           podman commit \
             --change='USER postgres' \
@@ -178,13 +187,15 @@ jobs:
         run: |
           podman tag ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
             ${{ env.APP_IMAGE_NAME }}:latest
+          podman tag ${{ env.REPO_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ${{ env.REPO_IMAGE_NAME }}:latest
           podman tag ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
             ${{ env.DB_IMAGE_NAME }}:latest
 
       - name: Clean up provisioning
         if: always()
         run: |
-          podman rm -f candlepin postgres || true
+          podman rm -f candlepin candlepin-repo postgres || true
           podman network rm -f provision-net || true
           podman rmi -f ${{ env.DB_IMAGE_NAME }}:base || true
 
@@ -197,16 +208,19 @@ jobs:
           podman network create test-net
           podman run -d --network test-net --name postgres \
             ${{ env.DB_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          podman run -d --network test-net --name candlepin-repo \
+            -p 8080:8080 \
+            ${{ env.REPO_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
           podman run -d --network test-net --name candlepin \
-            -p 18443:8443 -p 18080:8080 \
+            -p 8443:8443 \
             ${{ env.APP_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
 
           echo "Waiting for Candlepin..."
           ready=false
           for i in $(seq 1 60); do
-            if curl -sf -k https://localhost:18443/candlepin/status > /dev/null 2>&1; then
+            if curl -sf -k https://localhost:8443/candlepin/status > /dev/null 2>&1; then
               echo "Candlepin is ready"
-              curl -sk https://localhost:18443/candlepin/status | python3 -m json.tool
+              curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
               ready=true
               break
             fi
@@ -217,13 +231,15 @@ jobs:
             podman logs candlepin 2>&1 | tail -50
             exit 1
           fi
-          curl -sk -u admin:admin https://localhost:18443/candlepin/owners | python3 -m json.tool
-          curl --head -sf http://localhost:18080/RPM-GPG-KEY-candlepin
+          curl -sk -u admin:admin https://localhost:8443/candlepin/owners | python3 -m json.tool
+          curl --head -sf http://localhost:8080/RPM-GPG-KEY-candlepin
+          curl --head -sf http://localhost:8080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml
+          curl --head -sf http://localhost:8080/path/to/fake-content/38072-3902/repodata/repomd.xml
 
       - name: Clean up test
         if: always()
         run: |
-          podman rm -f candlepin postgres || true
+          podman rm -f candlepin candlepin-repo postgres || true
           podman network rm -f test-net || true
 
       # ---------------------------------------------------------------
@@ -247,6 +263,16 @@ jobs:
               ghcr.io/${{ github.repository_owner }}/${{ env.APP_IMAGE_NAME }}:latest
           fi
 
+      - name: Push candlepin-repo
+        if: inputs.push-image != 'false'
+        run: |
+          podman push ${{ env.REPO_IMAGE_NAME }}:${{ steps.tag.outputs.tag }} \
+            ghcr.io/${{ github.repository_owner }}/${{ env.REPO_IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
+          if [ "${{ inputs.update-latest || 'true' }}" = "true" ]; then
+            podman push ${{ env.REPO_IMAGE_NAME }}:latest \
+              ghcr.io/${{ github.repository_owner }}/${{ env.REPO_IMAGE_NAME }}:latest
+          fi
+
       - name: Push candlepin-db
         if: inputs.push-image != 'false'
         run: |
@@ -264,6 +290,7 @@ jobs:
           echo "| Image | Tag | Registry |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|-----|----------|" >> $GITHUB_STEP_SUMMARY
           echo "| candlepin-app | ${{ steps.tag.outputs.tag }} | ghcr.io/${{ github.repository_owner }}/candlepin-app |" >> $GITHUB_STEP_SUMMARY
+          echo "| candlepin-repo | ${{ steps.tag.outputs.tag }} | ghcr.io/${{ github.repository_owner }}/candlepin-repo |" >> $GITHUB_STEP_SUMMARY
           echo "| candlepin-db | ${{ steps.tag.outputs.tag }} | ghcr.io/${{ github.repository_owner }}/candlepin-db |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Base image:** \`${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}\`" >> $GITHUB_STEP_SUMMARY

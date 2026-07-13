@@ -1,13 +1,14 @@
-# candlepin-pod.yaml — Run candlepin-app + candlepin-db in a shared pod.
+# candlepin-pod.yaml — Run candlepin-app, candlepin-repo, and candlepin-db in a shared pod.
 #
 # Usage:
 #   podman play kube candlepin-pod.yaml         # start
 #   podman play kube candlepin-pod.yaml --down   # stop
 #
-# Both containers share the pod's network namespace, so Candlepin reaches
-# PostgreSQL at localhost:5432.  Two environment variables override the
-# db_host=postgres default baked into candlepin.conf (SmallRye Config
-# env vars have ordinal 300, which beats the config file at 225).
+# The containers share the pod's network namespace, so Candlepin reaches
+# PostgreSQL at localhost:5432 and the repo server is available at
+# localhost:8080. Two environment variables override the db_host=postgres
+# default baked into candlepin.conf (SmallRye Config env vars have ordinal
+# 300, which beats the config file at 225).
 
 apiVersion: v1
 kind: Pod
@@ -34,6 +35,10 @@ spec:
         - containerPort: 8443
           hostPort: 8443
           protocol: TCP
+
+    - name: candlepin-repo
+      image: ghcr.io/candlepin/candlepin-repo:latest
+      ports:
         - containerPort: 8080
           hostPort: 8080
           protocol: TCP
