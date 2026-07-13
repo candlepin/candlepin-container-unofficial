@@ -1,0 +1,2465 @@
+{
+    "packages": [
+        {
+            "name": "tricky-frog",
+            "version": "1"
+        },
+        {
+            "name": "lazy-fox",
+            "version": "1"
+        },
+        {
+            "name": "awesome-pig",
+            "version": "1"
+        },
+        {
+            "name": "awesome-cow",
+            "version": "1"
+        },
+        {
+            "name": "awesome-chicken",
+            "version": "1"
+        },
+        {
+            "name": "awesome-sheep",
+            "version": "2"
+        },
+        {
+            "name": "awesome-goat",
+            "version": "3",
+            "release": "14"
+        },
+        {
+            "name": "awesome-rabbit",
+            "version": "6",
+            "release": "626"
+        },
+        {
+            "name": "schrodingers-kitten",
+            "version": "2",
+            "release": "71"
+        },
+        {
+            "name": "slow-eagle",
+            "version": "1",
+            "release": "07"
+        },
+        {
+            "name": "cool-mouse",
+            "version": "1"
+        },
+        {
+            "name": "flying-fish",
+            "version": "1"
+        },
+        {
+            "name": "white-lion",
+            "version": "1"
+        },
+        {
+            "name": "jumping-snail",
+            "version": "1"
+        },
+        {
+            "name": "fluffy-snake",
+            "version": "1"
+        },
+        {
+            "name": "awesome-dummy-docker-conf",
+            "version": "1"
+        },
+        {
+            "name": "awesome-dummy-ostree-conf",
+            "version": "1"
+        },
+        {
+            "name": "awesome-dummy-deb",
+            "version": "1"
+        },
+        {
+            "name": "insights-client",
+            "version": "0.1",
+            "release": "01",
+            "files": [
+                {
+                    "path": "/usr/bin/insights-client",
+                    "type": "file",
+                    "perm": "0744",
+                    "owner": "root",
+                    "group": "root",
+                    "content": "#!/bin/bash"
+                },
+                {
+                    "path": "/etc/insights-client",
+                    "type": "directory"
+                }
+            ]
+        }
+    ],
+    "content": [
+        {
+            "name": "never-enabled-content",
+            "id": 100,
+            "label": "never-enabled-content",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/foo/path/never_enabled",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 600,
+            "packages": ["tricky-frog", "slow-eagle", "white-lion"]
+        },
+        {
+            "name": "tagged-content",
+            "id": 2,
+            "label": "tagged-content",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/foo/path/tagged",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "required_tags": "TAG1,TAG2",
+            "packages": ["lazy-fox", "white-lion", "fluffy-snake"]
+        },
+        {
+            "name": "content",
+            "id": 1111,
+            "label": "content-label",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/foo/path/common",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 0,
+            "packages": ["jumping-snail", "cool-mouse"]
+        },
+        {
+            "name": "content-nogpg",
+            "id": 234,
+            "label": "content-label-no-gpg",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/foo/path/no_gpg",
+            "metadata_expire": 0,
+            "packages": ["slow-eagle", "schrodingers-kitten"]
+        },
+        {
+            "name": "content-emptygpg",
+            "id": 235,
+            "label": "content-label-empty-gpg",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/foo/path/empty_gpg",
+            "gpg_url": "",
+            "metadata_expire": 0,
+            "packages": ["cool-mouse", "lazy-fox"]
+        },
+        {
+            "name": "awesomeos-modifier",
+            "id": 1112,
+            "label": "awesomeos-modifier",
+            "type": "yum",
+            "vendor": "test-vendor",
+            "content_url": "/example.com/awesomeos-modifier",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "modified_products": ["37060", "27060"],
+            "packages": ["awesome-pig"]
+        },
+        {
+            "name": "awesomeos",
+            "id": 11113,
+            "label": "awesomeos",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/generic/awesomeos",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-rabbit"]
+        },
+        {
+            "name": "awesomeos-x86",
+            "id": 11120,
+            "label": "awesomeos-x86",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/x86",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-goat"]
+        },
+        {
+            "name": "awesomeos-i386",
+            "id": 11122,
+            "label": "awesomeos-i386",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/i386",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-sheep"]
+        },
+        {
+            "name": "awesomeos-i686",
+            "id": 11123,
+            "label": "awesomeos-i686",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/i686",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-chicken"]
+        },
+        {
+            "name": "awesomeos-x86_64",
+            "id": 11124,
+            "label": "awesomeos-x86_64",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/x86_64",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-sheep", "awesome-chicken"]
+        },
+        {
+            "name": "awesomeos-ia64",
+            "id": 11125,
+            "label": "awesomeos-ia64",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/ia64",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-rabbit", "awesome-rabbit"]
+        },
+        {
+            "name": "awesomeos-ppc64",
+            "id": 11126,
+            "label": "awesomeos-ppc64",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/ppc64",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-chicken", "awesome-sheep"]
+        },
+        {
+            "name": "awesomeos-ppc",
+            "id": 11128,
+            "label": "awesomeos-ppc",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/ppc",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-chicken", "awesome-sheep", "awesome-rabbit"]
+        },
+        {
+            "name": "awesomeos-s390x",
+            "id": 11121,
+            "label": "awesomeos-s390x",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/s390x",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-cow", "awesome-pig"]
+        },
+        {
+            "name": "awesomeos-all",
+            "id": 11130,
+            "label": "awesomeos-all",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/all",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "packages": ["awesome-chicken", "awesome-rabbit", "awesome-sheep", "awesome-cow"]
+        },
+        {
+            "name": "awesomeos-i386-only-content",
+            "id": 38601,
+            "label": "awesomeos-i386-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/i386_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "i386",
+            "metadata_expire": 3600,
+            "packages": ["awesome-sheep"]
+        },
+        {
+            "name": "awesomeos-x86_64-i386-content",
+            "id": 38664,
+            "label": "awesomeos-x86_64-i386-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/x86_64_i368_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "x86_64,i386",
+            "metadata_expire": 3600,
+            "packages": ["awesome-cow"]
+        },
+        {
+            "name": "awesomeos-x86_64-only-content",
+            "id": 6401,
+            "label": "awesomeos-x86_64-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/x86_64_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "x86_64",
+            "metadata_expire": 3600,
+            "packages": ["awesome-rabbit"]
+        },
+        {
+            "name": "awesomeos-s390x-only-content",
+            "id": 39001,
+            "label": "awesomeos-s390x-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/s390x_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "s390x",
+            "metadata_expire": 3600,
+            "packages": ["awesome-pig"]
+        },
+        {
+            "name": "awesomeos-ppc64-only-content",
+            "id": 68064,
+            "label": "awesomeos-ppc64-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/ppc64_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "ppc64",
+            "metadata_expire": 3600,
+            "packages": ["awesome-pig", "awesome-sheep"]
+        },
+        {
+            "name": "awesomeos-ppc-only-content",
+            "id": 68000,
+            "label": "awesomeos-ppc-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/ppc_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "ppc",
+            "metadata_expire": 3600,
+            "packages": ["awesome-sheep", "awesome-rabbit"]
+        },
+        {
+            "name": "awesomeos-ia64-only-content",
+            "id": 64000,
+            "label": "awesomeos-ia64-only-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos/i64_content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "arches": "ia64",
+            "metadata_expire": 3600,
+            "packages": ["awesome-sheep", "awesome-cow"]
+        },
+        {
+            "name": "awesomeos-server-scalable-fs",
+            "id": 3700,
+            "label": "awesomeos-server-scalable-fs",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos-server-scalable-fs",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "modified_products": ["37060"],
+            "packages": ["awesome-sheep", "schrodingers-kitten"]
+        },
+        {
+            "name": "awesomeos-workstation-scalable-fs",
+            "id": 3701,
+            "label": "awesomeos-workstation-scalable-fs",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos-workstation-scalable-fs",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "metadata_expire": 3600,
+            "modified_products": ["27060"],
+            "packages": ["awesome-sheep", "jumping-snail"]
+        },
+        {
+            "name": "awesomeos-docker-images",
+            "id": 3801,
+            "label": "awesomeos-docker-images",
+            "type": "containerImage",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos-docker-images",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "packages": ["awesome-dummy-docker-conf"]
+        },
+        {
+            "name": "awesomeos-ostree",
+            "id": 3802,
+            "label": "awesomeos-ostree",
+            "type": "ostree",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/awesomeos-ostree",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "packages": ["awesome-dummy-ostree-conf"]
+        },
+        {
+            "name": "awesomeos-deb",
+            "id": 3901,
+            "label": "awesomeos-deb",
+            "type": "deb",
+            "vendor": "Foo Vendor",
+            "content_url": "/path/to/awesomeos-deb",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "packages": ["awesome-dummy-deb"]
+        },
+        {
+            "name": "fake-content",
+            "id": 3902,
+            "label": "fake-content",
+            "type": "yum",
+            "vendor": "Red Hat",
+            "content_url": "/path/to/fake-content",
+            "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+            "packages": ["insights-client"]
+        }
+    ],
+    "owners": [
+        {
+            "name": "admin",
+            "displayName": "Admin Owner",
+            "contentAccessModeList": "entitlement",
+            "contentAccessMode": "entitlement",
+            "content": [
+                {
+                    "name": "admin-content",
+                    "id": 5000,
+                    "label": "admin-content-label",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/foo/admin/path/common",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "metadata_expire": 0,
+                    "packages": ["fluffy-snake"]
+                },
+                {
+                    "name": "admin-tagged-content",
+                    "id": 5001,
+                    "label": "admin-tagged-content",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/foo/admin/path/always",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "required_tags": "TAG1,TAG2",
+                    "packages": ["tricky-frog"]
+                },
+                {
+                    "name": "admin-never-enabled-content",
+                    "id": 5002,
+                    "label": "admin-never-enabled-content",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/foo/admin/path/never",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "metadata_expire": 600,
+                    "packages": ["lazy-fox"]
+                }
+            ],
+            "products": [
+                {
+                    "name": "Admin OS Premium Architecture Bits",
+                    "id": "5050",
+                    "version": "6.1",
+                    "arch": "ppc64",
+                    "provided_products": [
+                        "37060"
+                    ],
+                    "attributes": {
+                        "sockets": 2,
+                        "vcpu": 4,
+                        "warning_period": 30
+                    },
+                    "content": [
+                        [5000, false]
+                    ]
+                },
+                {
+                    "name": "Admin OS Developer Bits",
+                    "id": "5051",
+                    "content": [
+                        [5000, false],
+                        [5001, false]
+                    ]
+                },
+                {
+                    "name": "Admin OS Server Bundled (2 Sockets, Standard Support)",
+                    "id": "adminos-server-2-socket-std",
+                    "version": "6.1",
+                    "type": "MKT",
+                    "provided_products": [
+                        "37065",
+                        "37070",
+                        "37067",
+                        "37068",
+                        "37069",
+                        "37060",
+                        "5050",
+                        "5051"
+                    ],
+                    "attributes": {
+                        "sockets": 2,
+                        "vcpu": 4,
+                        "warning_period": 30,
+                        "management_enabled" : 1,
+                        "support_level" : "Standard",
+                        "support_type" : "L1-L3"
+                    }
+                },
+                {
+                    "name": "Admin OS Instance Based one socket",
+                    "id": "adminos-onesocketib",
+                    "type": "MKT",
+                    "provided_products": [
+                        "32060",
+                        "5050",
+                        "5051"
+                    ],
+                    "attributes": {
+                        "instance_multiplier": 2,
+                        "sockets": 1,
+                        "virt_limit": 1,
+                        "host_limited": "true",
+                        "stacking_id": 15,
+                        "multi-entitlement": "yes",
+                        "support_level" : "Standard",
+                        "support_type" : "L1-L3"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "snowwhite",
+            "displayName": "Snow White",
+            "contentAccessModeList": "entitlement,org_environment",
+            "contentAccessMode": "entitlement",
+            "content": [
+                {
+                    "name": "snowy-content",
+                    "id": 6000,
+                    "label": "snowy-content-label",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/snowy/foo/path/common",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "metadata_expire": 0,
+                    "packages": ["slow-eagle"]
+                },
+                {
+                    "name": "snowy-tagged-content",
+                    "id": 6001,
+                    "label": "snowy-tagged-content",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/snowy/foo/path/always",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "required_tags": "TAG1,TAG2",
+                    "packages": ["jumping-snail"]
+                },
+                {
+                    "name": "snowy-never-enabled-content",
+                    "id": 6002,
+                    "label": "snowy-never-enabled-content",
+                    "type": "yum",
+                    "vendor": "test-vendor",
+                    "content_url": "/snowy/foo/path/never",
+                    "gpg_url": "file:///etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin",
+                    "metadata_expire": 600,
+                    "packages": ["tricky-frog"]
+                }
+            ],
+            "products": [
+                {
+                    "name": "Snowy OS Premium Architecture Bits",
+                    "id": "6050",
+                    "version": "6.1",
+                    "arch": "ppc64",
+                    "provided_products": [
+                        "37060"
+                    ],
+                    "attributes": {
+                        "sockets": 2,
+                        "vcpu": 4,
+                        "warning_period": 30
+                    },
+                    "content": [
+                        [6000, false]
+                    ]
+                },
+                {
+                    "name": "Snowy OS Developer Bits",
+                    "id": "6051",
+                    "content": [
+                        [6000, false],
+                        [6001, false]
+                    ]
+                },
+                {
+                    "name": "Snowy OS Server Bundled (2 Sockets, Standard Support)",
+                    "id": "snowyos-server-2-socket-std",
+                    "version": "6.1",
+                    "type": "MKT",
+                    "provided_products": [
+                        "37065",
+                        "37070",
+                        "37067",
+                        "37068",
+                        "37069",
+                        "37060",
+                        "6050",
+                        "6051"
+                    ],
+                    "attributes": {
+                        "sockets": 2,
+                        "vcpu": 4,
+                        "warning_period": 30,
+                        "management_enabled" : 1,
+                        "support_level" : "Standard",
+                        "support_type" : "L1-L3"
+                    }
+                },
+                {
+                    "name": "Snowy OS Instance Based one socket",
+                    "id": "snowyos-onesocketib",
+                    "type": "MKT",
+                    "provided_products": [
+                        "32060",
+                        "6050",
+                        "6051"
+                    ],
+                    "attributes": {
+                        "instance_multiplier": 2,
+                        "sockets": 1,
+                        "virt_limit": 1,
+                        "host_limited": "true",
+                        "stacking_id": 15,
+                        "multi-entitlement": "yes",
+                        "support_level" : "Standard",
+                        "support_type" : "L1-L3"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "donaldduck",
+            "displayName": "Donald Duck",
+            "contentAccessModeList": "entitlement,org_environment",
+            "contentAccessMode": "org_environment"
+        }
+    ],
+    "users": [
+        {
+            "password": "password",
+            "username": "testuser1"
+        },
+        {
+            "password": "password",
+            "username": "testuser2"
+        },
+        {
+            "password": "password",
+            "username": "testuser3"
+        },
+        {
+            "password": "password",
+            "username": "doc",
+            "superadmin": "true"
+        },
+        {
+            "password": "password",
+            "username": "grumpy"
+        },
+        {
+            "password": "password",
+            "username": "happy"
+        },
+        {
+            "password": "password",
+            "username": "sleepy"
+        },
+        {
+            "password": "password",
+            "username": "bashful"
+        },
+        {
+            "password": "password",
+            "username": "sneezy"
+        },
+        {
+            "password": "password",
+            "username": "dopey"
+        },
+        {
+            "password": "password",
+            "username": "huey",
+            "superadmin": "true"
+        },
+        {
+            "password": "password",
+            "username": "duey"
+        },
+        {
+            "password": "password",
+            "username": "louie"
+        },
+        {
+            "password": "password",
+            "username": "mickey"
+        },
+        {
+            "password": "password",
+            "username": "minnie"
+        },
+        {
+            "password": "password",
+            "username": "magoo"
+        }
+    ],
+    "roles": [
+        {
+            "name": "admin-all",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "admin",
+                    "access": "ALL"
+                }
+            ],
+            "users": [
+                {"username": "testuser1"},
+                {"username": "testuser2"}
+            ]
+        },
+        {
+            "name": "admin-ro",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "admin",
+                    "access": "READ_ONLY"
+                }
+            ],
+            "users": [
+                {"username": "testuser3"}
+            ]
+        },
+        {
+            "name": "snowwhite-all",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "snowwhite",
+                    "access": "ALL"
+                }
+            ],
+            "users": [
+                {"username": "doc"},
+                {"username": "testuser1"},
+                {"username": "grumpy"}
+            ]
+        },
+        {
+            "name": "snowwhite-ro",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "snowwhite",
+                    "access": "READ_ONLY"
+                }
+            ],
+            "users": [
+                {"username": "happy"},
+                {"username": "sleepy"},
+                {"username": "bashful"},
+                {"username": "sneezy"},
+                {"username": "dopey"}
+            ]
+        },
+        {
+            "name": "donaldduck-all",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "donaldduck",
+                    "access": "ALL"
+            }
+            ],
+            "users": [
+                {"username": "huey"},
+                {"username": "duey"}
+            ]
+        },
+        {
+            "name": "donaldduck-ro",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "donaldduck",
+                    "access": "READ_ONLY"
+                }
+            ],
+            "users": [
+                {"username": "louie"}
+            ]
+        },
+        {
+            "name": "donaldduck-all-snowwhite-ro",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "donaldduck",
+                    "access": "ALL"
+                },
+                {
+                    "type": "OWNER",
+                    "owner": "snowwhite",
+                    "access": "READ_ONLY"
+                }
+            ],
+            "users": [
+                {"username": "mickey"}
+            ]
+        },
+        {
+            "name": "donaldduck-ro-snowwhite-all",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "donaldduck",
+                    "access": "READ_ONLY"
+                },
+                {
+                    "type": "OWNER",
+                    "owner": "snowwhite",
+                    "access": "ALL"
+                }
+            ],
+            "users": [
+                {"username": "minnie"}
+            ]
+        },
+        {
+            "name": "donaldduck-ro-snowwhite-ro-admin-ro",
+            "permissions": [
+                {
+                    "type": "OWNER",
+                    "owner": "donaldduck",
+                    "access": "READ_ONLY"
+                },
+                {
+                    "type": "OWNER",
+                    "owner": "admin",
+                    "access": "READ_ONLY"
+                },
+                {
+                    "type": "OWNER",
+                    "owner": "snowwhite",
+                    "access": "READ_ONLY"
+                }
+            ],
+            "users": [
+                {"username": "magoo"}
+            ]
+        }
+    ],
+    "products": [
+        {
+            "name": "Clustering Bits (no content)",
+            "id": "37065",
+            "attributes": {
+                    "sockets": 2,
+                    "vcpu": 4
+            },
+            "content": []
+        },
+        {
+            "name": "Load Balancing Bits (no content)",
+            "id": "37070",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": []
+        },
+        {
+            "name": "Shared Storage Bits (no content)",
+            "id": "37067",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": []
+        },
+        {
+            "name": "Large File Support Bits (no content)",
+            "id": "37068",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": []
+        },
+        {
+            "name": "Management Bits (no content)",
+            "id": "37069",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": []
+        },
+        {
+            "name": "Shared File System Bits (no content)",
+            "id": "88888",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2
+            },
+            "content": []
+        },
+        {
+            "name": "Awesome OS Server Bits",
+            "id": "37060",
+            "version": "6.1",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [1111, false],
+                [100, false],
+                [2, false],
+                [234, false],
+                [235, false]
+            ]
+        },
+        {
+            "name": "Awesome Hypervisor Bits (no content)",
+            "id": "98121",
+            "version": "6.1",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": []
+        },
+        {
+            "name": "Awesome OS Instance Server Bits",
+            "id": "32060",
+            "version": "6.1",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [1111, false],
+                [100, false],
+                [2, false],
+                [234, false],
+                [235, false]
+            ]
+        },
+        {
+            "name": "Awesome OS Workstation Bits",
+            "id": "27060",
+            "version": "6.1",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "brand_type": "OS"
+
+            },
+            "content": [
+                [1111, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS Modifier Bits",
+            "id": "37080",
+            "version": "6.1",
+            "content": [
+                [1112, false]
+            ]
+        },
+        {
+            "name": "Awesome OS Docker Bits",
+            "id": "37090",
+            "content": [
+                [3801, true]
+            ]
+        },
+        {
+            "name": "Awesome OS Docker",
+            "id": "awesomeos-docker",
+            "type": "MKT",
+            "provided_products": [
+                "37090"
+            ]
+        },
+        {
+            "name": "Awesome OS OStree Bits",
+            "id": "37091",
+            "content": [
+                [3802, true]
+            ]
+        },
+        {
+            "name": "Awesome OS OSTree",
+            "id": "awesomeos-ostree",
+            "type": "MKT",
+            "provided_products": [
+                "37091"
+            ]
+        },
+        {
+            "name": "Awesome OS Modifier",
+            "id": "awesomeos-modifier",
+            "type": "MKT",
+            "provided_products": [
+                "37080"
+            ]
+        },
+        {
+            "name": "Awesome OS Debian Bits",
+            "id": "38070",
+            "content": [
+                [3901, true]
+            ]
+        },
+        {
+            "name": "Awesome OS Debian Bits",
+            "id": "awesomeos-debian",
+            "type": "MKT",
+            "provided_products": [
+                "38070"
+            ]
+        },
+        {
+            "name": "Fake OS Bits",
+            "id": "38072",
+            "content": [
+                [3902, true]
+            ]
+        },
+        {
+            "name": "Fake OS Bits",
+            "id": "fakeos-bits",
+            "type": "MKT",
+            "provided_products": [
+                "38072"
+            ]
+        },
+        {
+            "name": "Awesome OS Server Bundled",
+            "id": "awesomeos-server",
+            "type": "MKT",
+            "provided_products": [
+                "37065",
+                "37070",
+                "37067",
+                "37068",
+                "37069",
+                "37060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "management_enabled" : 1,
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            }
+        },
+        {
+            "name": "Awesome OS Server Basic",
+            "id": "awesomeos-server-basic",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "management_enabled" : 0,
+                "support_level" : "None",
+                "support_type" : "Self-Support",
+                "multi-entitlement" : "no"
+            }
+        },
+        {
+            "name": "Awesome OS Server Basic (dc-virt, no content)",
+            "id": "awesomeos-server-basic-vdc",
+            "type": "MKT",
+            "version": "0.1",
+            "arch": "x86_64,x86,s390x,ppc64,ia64,arm",
+            "skip_pools" : "true",
+            "provided_products": ["37080", "37060"],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "cores": 4,
+                "ram": 2,
+                "support_level": "Full-Service",
+                "support_type": "Drive-Through"
+            }
+        },
+        {
+            "name": "Awesome OS Server Basic (data center)",
+            "id": "awesomeos-server-basic-dc",
+            "type": "MKT",
+            "provided_products": [],
+            "attributes": {
+                "sockets": 4,
+                "vcpu": 8,
+                "warning_period": 30,
+                "management_enabled" : 0,
+                "support_level" : "None",
+                "support_type" : "Self-Support",
+                "multi-entitlement" : "no",
+                "virt_limit" : "unlimited",
+                "host_limited": "true"
+            },
+            "derived_product_id" : "awesomeos-server-basic-vdc"
+        },
+        {
+            "name": "Awesome OS Server Basic (multi-entitlement)",
+            "id": "awesomeos-server-basic-me",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "management_enabled" : 0,
+                "support_level" : "None",
+                "support_type" : "Self-Support",
+                "multi-entitlement" : "yes"
+            }
+        },
+        {
+            "name": "Awesome OS Workstation Basic",
+            "id": "awesomeos-workstation-basic",
+            "type": "MKT",
+            "provided_products": [
+                "27060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "management_enabled" : 0,
+                "support_level" : "Standard",
+                "support_type" : "L1-L3",
+                "brand_type" : "OS"
+            }
+        },
+        {
+            "name": "Awesome OS Developer Bits",
+            "id": "1",
+            "content": [
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS Server Bundled (2 Sockets, Standard Support)",
+            "id": "awesomeos-server-2-socket-std",
+            "version": "6.1",
+            "type": "MKT",
+            "provided_products": [
+                "37065",
+                "37070",
+                "37067",
+                "37068",
+                "37069",
+                "37060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30,
+                "management_enabled" : 1,
+                "support_level" : "Standard",
+                "support_type" : "L1-L3"
+            }
+        },
+        {
+            "name": "Awesome OS Instance Based (Standard Support)",
+            "id": "awesomeos-instancebased",
+            "type": "MKT",
+            "provided_products": [
+                "32060"
+            ],
+            "attributes": {
+                "instance_multiplier": 2,
+                "sockets": 2,
+                "virt_limit": 1,
+                "host_limited": "true",
+                "stacking_id": 15,
+                "multi-entitlement": "yes",
+                "support_level" : "Standard",
+                "support_type" : "L1-L3"
+            }
+        },
+        {
+            "name": "Awesome OS Instance Based one socket",
+            "id": "awesomeos-onesocketib",
+            "type": "MKT",
+            "provided_products": [
+                "32060"
+            ],
+            "attributes": {
+                "instance_multiplier": 2,
+                "sockets": 1,
+                "virt_limit": 1,
+                "host_limited": "true",
+                "stacking_id": 15,
+                "multi-entitlement": "yes",
+                "support_level" : "Standard",
+                "support_type" : "L1-L3"
+            }
+        },
+        {
+            "name": "Awesome OS Premium Architecture Bits",
+            "id": "37062",
+            "version": "6.1",
+            "arch": "ppc64",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "warning_period": 30
+            },
+            "content": [
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for S390X Bits",
+            "id": "100000000000000",
+            "version": "3.11",
+            "arch": "s390x",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11121, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for S390X",
+            "id": "awesomeos-s390x",
+            "version": "3.11",
+            "arch": "s390x",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS for S390 Bits",
+            "id": "100000000000060",
+            "version": "3.11",
+            "arch": "s390",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11121, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for S390",
+            "id": "awesomeos-s390",
+            "version": "3.11",
+            "arch": "s390",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000060"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS for i386 Bits",
+            "id": "100000000000001",
+            "version": "3.11",
+            "arch": "i386",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11122, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for i386",
+            "id": "awesomeos-i386",
+            "version": "3.11",
+            "arch": "i386",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000001"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Virt Only Awesome OS for i386 Bits",
+            "id": "100000000000069",
+            "version": "3.11",
+            "arch": "i386",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "virt_only": "true",
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11122, false]
+            ]
+        },
+        {
+            "name": "Virt Only Awesome OS for i386",
+            "id": "virt-awesomeos-i386",
+            "version": "3.11",
+            "arch": "i386",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000069"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30,
+                "virt_only": "true"
+            }
+        },
+        {
+            "name": "Awesome OS for i686 Bits",
+            "id": "100000000000005",
+            "version": "3.11",
+            "arch": "i686",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11123, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for i686",
+            "id": "awesomeos-i686",
+            "version": "3.11",
+            "arch": "i686",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000005"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS for x86_64 Bits",
+            "id": "100000000000002",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for x86_64",
+            "id": "awesomeos-x86_64",
+            "version": "3.11",
+            "arch": "x86_64",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000002"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Awesome OS for All Arch (excpt for x86_64 content) Bits",
+            "id": "213412341234",
+            "version": "3.11",
+            "arch": "ALL",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [68064, false],
+                [68000, false],
+                [64000, false],
+                [39001, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for All Arch (except for x86_64 content)",
+            "id": "awesomeos-all-no-86_64-cont",
+            "version": "3.11",
+            "arch": "ALL",
+            "type": "MKT",
+            "provided_products": [
+                "213412341234"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Awesome OS for All Arch (all per arch content) Bits",
+            "id": "213412341236",
+            "version": "3.11",
+            "arch": "ALL",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [6401, false],
+                [68064, false],
+                [68000, false],
+                [64000, false],
+                [39001, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for All Arch (all per arch content)",
+            "id": "awesomeos-per-arch-cont",
+            "version": "3.11",
+            "arch": "ALL",
+            "type": "MKT",
+            "provided_products": [
+                "213412341236"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes"
+            }
+        },
+
+        {
+            "name": "Awesome OS for All Arch (x86 content) Bits",
+            "id": "213412341237",
+            "version": "3.11",
+            "arch": "ALL",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [38664, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for All Arch (x86content)",
+            "id": "awesomeos-all-x86-cont",
+            "version": "3.11",
+            "arch": "ALL",
+            "type": "MKT",
+            "provided_products": [
+                "213412341237"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Awesome OS for All Arch (just x86_64 content) Bits",
+            "id": "213412341235",
+            "version": "3.11",
+            "arch": "ALL",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [6401, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for All Arch (just x86_64 content)",
+            "id": "awesomeos-all-just-86_64-cont",
+            "version": "3.11",
+            "arch": "ALL",
+            "type": "MKT",
+            "provided_products": [
+                "213412341235"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Stackable with Awesome OS for x86_64 Bits",
+            "id": "1000000000000023",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false]
+            ]
+        },
+        {
+            "name": "Stackable with Awesome OS for x86_64",
+            "id": "stackable-with-awesomeos-x86_64",
+            "version": "3.11",
+            "arch": "x86_64",
+            "type": "MKT",
+            "provided_products": [
+                "1000000000000023"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "vcpu": 2,
+                "warning_period": 30,
+                "stacking_id": 1
+            }
+        },
+        {
+            "name": "Awesome OS for ia64 Bits",
+            "id": "100000000000006",
+            "version": "3.11",
+            "arch": "ia64",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "stacking_id": 2,
+                "multi-entitlement": "yes",
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11125, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for ia64",
+            "id": "awesomeos-ia64",
+            "version": "3.11",
+            "arch": "ia64",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000006"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30,
+                "stacking_id": 2,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Awesome OS for ppc64 Bits",
+            "id": "100000000000003",
+            "version": "3.11",
+            "arch": "ppc64",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11126, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for ppc64",
+            "id": "awesomeos-ppc64",
+            "version": "3.11",
+            "arch": "ppc64",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000003"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS for x86 Bits",
+            "id": "100000000000020",
+            "version": "8.6",
+            "arch": "x86",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11120, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for x86",
+            "id": "awesomeos-x86",
+            "version": "8.6",
+            "arch": "x86",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000020"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS for x86_64/i686/ia64/ppc/ppc64/s390x/s390 Bits",
+            "id": "100000000000011",
+            "version": "3.11",
+            "arch": "x86_64,i686,ia64,ppc,ppc64,s390x,s390",
+            "attributes": {
+                "sockets": 128,
+                "vcpu": 256,
+                "warning_period": 30,
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false],
+                [11123, false],
+                [11125, false],
+                [11128, false],
+                [11126, false],
+                [11121, false]
+            ]
+        },
+        {
+            "name": "Awesome OS for x86_64/i686/ia64/ppc/ppc64/s390x/s390",
+            "id": "awesomeos-everything",
+            "version": "3.11",
+            "arch": "x86_64,i686,ia64,ppc,ppc64,s390x,s390",
+            "type": "MKT",
+            "provided_products": [
+                "100000000000011"
+            ],
+            "attributes": {
+                "sockets": 16,
+                "vcpu": 32,
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Awesome OS with up to 4 virtual guests",
+            "id": "awesomeos-virt-4",
+            "version": "6.1",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "virt_limit": 4,
+                "multi-entitlement": "yes"
+            }
+        },
+        {
+            "name": "Awesome OS Stackable guest limit 4",
+            "id": "awesomeos-guestlimit-4-stackable",
+            "version": "6.1",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "virt_limit": 4,
+                "guest_limit": 4,
+                "multi-entitlement": "yes",
+                "stacking_id": "aos-4virt-stackable"
+            }
+        },
+        {
+            "name": "Awesome OS Super Hypervisor (no content)",
+            "id": "awesomeos-super-hypervisor",
+            "version": "6.1",
+            "type": "MKT",
+            "provided_products": [
+                "98121"
+            ],
+            "attributes": {
+                "virt_limit": "4",
+                "guest_limit": "-1",
+                "multi-entitlement": "yes",
+                "stacking_id": "aos-hypervisor-st"
+            }
+        },
+        {
+            "name": "Awesome OS with unlimited virtual guests",
+            "id": "awesomeos-virt-unlimited",
+            "version": "6.1",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "virt_limit": "unlimited"
+            }
+        },
+        {
+            "name": "Awesome OS physical with unlimited guests",
+            "id": "awesomeos-virt-unlmtd-phys",
+            "version": "6.2",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "virt_limit": "unlimited",
+                "physical_only": "true"
+            }
+        },
+        {
+            "name": "Awesome OS Virtual Datacenter",
+            "id": "awesomeos-virt-datacenter",
+            "version": "7.0",
+            "type": "MKT",
+            "provided_products": [
+                "37060"
+            ],
+            "attributes": {
+                "virt_limit": "unlimited",
+                "host_limited": "true",
+                "physical_only": "true"
+            }
+        },
+        {
+            "name": "Multiplier Product Bits",
+            "id": "917571",
+            "content": [
+                [100, false]
+            ]
+        },
+        {
+            "name": "Multiplier Product Client Pack (50)",
+            "id": "MKT-multiplier-client-50",
+            "multiplier": 50,
+            "type": "MKT",
+            "provided_products": [
+                "917571"
+            ],
+            "attributes": {
+                "requires_consumer_type": "domain",
+                "enabled_consumer_types": "domain",
+                "multi-entitlement": "yes",
+                "warning_period": 30
+            }
+        },
+        {
+            "name": "Management Add-On",
+            "id": "management-100",
+            "multiplier": 100,
+            "type": "MKT",
+            "attributes": {
+                "multi-entitlement": "no",
+                "warning_period": 90,
+                "management_enabled" : 1
+            }
+        },
+        {
+            "name": "Shared File System",
+            "id": "sfs",
+            "type": "MKT",
+            "provided_products": [
+                "88888"
+            ],
+            "attributes": {
+                "support_level": "Layered",
+                "support_level_exempt": "true"
+            }
+        },
+        {
+            "name": "RAM Limiting Product",
+            "id": "801",
+            "version": "1.0",
+            "arch": "x86_64",
+            "attributes": {
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false],
+                [11123, false],
+                [11125, false],
+                [11128, false],
+                [11126, false],
+                [11121, false]
+            ]
+        },
+        {
+            "name": "RAM Limiting Package (8GB)",
+            "id": "ram-8gb",
+            "type": "MKT",
+            "attributes": {
+                "ram": 8
+            },
+            "provided_products": [
+                "801"
+            ]
+        },
+        {
+            "name": "RAM Limiting Package (4GB stackable)",
+            "id": "ram-4gb-stackable",
+            "type": "MKT",
+            "attributes": {
+                "ram": 4,
+                "multi-entitlement": "yes",
+                "stacking_id": "ram-stackable"
+            },
+            "provided_products": [
+                "801"
+            ]
+        },
+        {
+            "name": "RAM Limiting Package (2GB stackable)",
+            "id": "ram-2gb-stackable",
+            "type": "MKT",
+            "attributes": {
+                "ram": 2,
+                "multi-entitlement": "yes",
+                "stacking_id": "ram-stackable"
+            },
+            "provided_products": [
+                "801"
+            ]
+        },
+        {
+            "name": "RAM/Cores Package (8GB, 4 cores)",
+            "id": "ram-cores-8gb-4cores",
+            "type": "MKT",
+            "attributes": {
+                "ram": 8,
+                "cores": 4
+            },
+            "provided_products": [
+                "801"
+            ]
+        },
+        {
+            "name": "Core Limiting Product",
+            "id": "806",
+            "version": "1.0",
+            "arch": "x86_64",
+            "attributes": {
+            },
+            "content": [
+                [11124, false]
+            ]
+        },
+        {
+            "name": "Cores Package (26 cores)",
+            "id": "cores-26",
+            "type": "MKT",
+            "attributes": {
+                "cores": 26
+            },
+            "provided_products": [
+                "806"
+            ]
+        },
+        {
+            "name": "Stackable Cores Package (8 cores)",
+            "id": "cores-8-stackable",
+            "type": "MKT",
+            "attributes": {
+                "cores": 8,
+                "multi-entitlement": "yes",
+                "stacking_id": "cores-8-stackable"
+            },
+            "provided_products": [
+                "806"
+            ]
+        },
+        {
+            "name": "Multi-Attribute Limited Product (no content)",
+            "id": "900",
+            "version": "1.0",
+            "arch": "x86_64",
+            "attributes": {
+            },
+            "content": []
+        },
+        {
+            "name": "Multi-Attribute Stackable (2 sockets, no content)",
+            "id": "sock2-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "sockets": 2,
+                "vcpu": 4,
+                "multi-entitlement": "yes",
+                "stacking_id": "multiattr-stack-test",
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute Stackable (4 cores, no content)",
+            "id": "cores4-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "cores": 4,
+                "multi-entitlement": "yes",
+                "stacking_id": "multiattr-stack-test",
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute Stackable (2 GB, no content)",
+            "id": "ram2-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "ram": 2,
+                "multi-entitlement": "yes",
+                "stacking_id": "multiattr-stack-test",
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute Stackable (2 GB, 2 Cores, no content)",
+            "id": "2cores-2ram-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "cores": 2,
+                "ram": 2,
+                "multi-entitlement": "yes",
+                "stacking_id": "multiattr-stack-test",
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute Stackable (16 cores, 4 sockets, 8GB RAM, no content)",
+            "id": "sock-core-ram-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "sockets": 4,
+                "ram": 8,
+                "cores": 16,
+                "vcpu": 8,
+                "multi-entitlement": "yes",
+                "stacking_id": "multiattr-stack-test",
+                "support_level" : "Super",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute (non-stackable) (6 cores, 8GB, no content)",
+            "id": "non-stacked-6core8ram-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "cores": 6,
+                "ram": 8,
+                "support_level" : "Super",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute (non-stackable) (24 cores, 6 sockets, 8GB RAM, no content)",
+            "id": "non-stacked-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "sockets": 6,
+                "ram": 8,
+                "cores": 24,
+                "vcpu": 12,
+                "support_level" : "Super",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Multi-Attribute (multi-entitlement only) (8 cores, 4GB, no content)",
+            "id": "non-stacked-8core4ram-multiattr",
+            "type": "MKT",
+            "attributes": {
+                "multi-entitlement": "yes",
+                "cores": 8,
+                "ram": 4,
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "900"
+            ]
+        },
+        {
+            "name": "Band Limited Product",
+            "id": "908",
+            "version": "1.0",
+            "arch": "x86_64",
+            "attributes": {
+            },
+            "content": []
+        },
+        {
+            "name": "Storage Limited (256 TB, no content)",
+            "id": "storage-limited-256",
+            "type": "MKT",
+            "multiplier": 256,
+            "quantity": "1",
+            "attributes": {
+                "multi-entitlement": "yes",
+                "stacking_id": "STORAGELIMITED",
+                "storage_band": 1,
+                "support_level" : "Premium",
+                "support_type" : "Level 3"
+            },
+            "provided_products": [
+                "908"
+            ]
+        },
+        {
+            "name": "Development SKU Product",
+            "id": "dev-sku-product",
+            "type": "MKT",
+            "skip_pools": "true",
+            "provided_products": [
+                "100000000000011"
+            ],
+            "attributes": {
+                "support_level" : "Premium",
+                "support_type" : "Level 3",
+                "expires_after" : "75"
+            }
+        },
+        {
+            "name": "Development SKU Product, no content, no provided product",
+            "id": "dev-sku-no-provided-product",
+            "type": "MKT",
+            "skip_pools": "true",
+            "attributes": {
+                "support_level" : "Premium",
+                "support_type" : "Level 3",
+                "expires_after" : "75"
+            }
+        },
+        {
+            "name": "Awesome OS Unlimited Quantity",
+            "id": "awesomeos-unlimited-quantity",
+            "type": "MKT",
+            "quantity": "-1",
+            "attributes": {
+                "multi-entitlement": "yes"
+            },
+            "provided_products": [
+                "37060"
+            ]
+        },
+        {
+            "name": "Awesome OS Unlimited Quantity Virt Limit",
+            "id": "awesomeos-ul-quantity-virt",
+            "type": "MKT",
+            "quantity": "-1",
+            "attributes": {
+                "multi-entitlement": "yes",
+                "virt_limit": "unlimited"
+            },
+            "provided_products": [
+                "37060"
+            ]
+        },
+        {
+            "name": "SP Server (S: Standard)",
+            "id": "sp-server",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "support_level" : "Standard",
+                "support_type" : "L1-L3"
+            }
+        },
+        {
+            "name": "SP Server Premium (S: Premium, U: Production, R: SP Server)",
+            "id": "sp-server-prem-prod",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "support_level" : "Premium",
+                "support_type" : "L1-L3",
+                "usage" : "Production",
+                "roles" : "SP Server"
+            }
+        },
+        {
+            "name": "SP Server (U: Production, R: SP Server)",
+            "id": "sp-server-prod",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "usage" : "Production",
+                "roles" : "SP Server"
+            }
+        },
+        {
+            "name": "SP Server (S: Layered, U: Production, R: SP Server)",
+            "id": "sp-server-layered-prod",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "support_level": "Layered",
+                "support_level_exempt": "true",
+                "usage" : "Production",
+                "roles" : "SP Server"
+            }
+        },
+        {
+            "name": "SP Server Standard (U: Development, R: SP Server)",
+            "id": "sp-server-dev",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "support_level" : "Standard",
+                "support_type" : "L1-L3",
+                "usage" : "Development",
+                "roles" : "SP Server"
+            }
+        },
+        {
+            "name": "SP Server Instance Based (S: Standard, U: Production, R: SP Server)",
+            "id": "sp-server-instancebased",
+            "type": "MKT",
+            "provided_products": [
+                "99000"
+            ],
+            "attributes": {
+                "sockets": 1,
+                "instance_multiplier": 2,
+                "virt_limit": 1,
+                "host_limited": "true",
+                "multi-entitlement": "yes",
+                "support_level" : "Standard",
+                "support_type" : "L1-L3",
+                "usage" : "Production",
+                "roles" : "SP Server",
+                "stacking_id": 1000000
+            }
+        },
+        {
+            "name": "SP Starter Pack (S: Premium, R: SP Starter)",
+            "id": "sp-starter-pack",
+            "type": "MKT",
+            "provided_products": [
+                "99000",
+                "99001"
+            ],
+            "attributes": {
+                "sockets": 128,
+                "management_enabled" : 1,
+                "support_level" : "Premium",
+                "support_type" : "L1-L3",
+                "roles" : "SP Starter"
+            }
+        },
+        {
+            "name": "SP Smart Management (A: ADDON1)",
+            "id": "sp-with-addon-1",
+            "type": "MKT",
+            "provided_products": [
+                "99003"
+            ],
+            "attributes": {
+                "management_enabled" : 1,
+                "addons": "ADDON1"
+            }
+        },
+        {
+            "name": "SP Addon 2 (A: ADDON2)",
+            "id": "sp-with-addon-2",
+            "type": "MKT",
+            "provided_products": [
+                "99004"
+            ],
+            "attributes": {
+                "management_enabled" : 1,
+                "addons": "ADDON2"
+            }
+        },
+        {
+            "name": "SP Addon 3 (S: Premium, R: SP Server,SP Starter, A: ADDON3)",
+            "id": "sp-with-addon-3",
+            "type": "MKT",
+            "provided_products": [
+                "99005"
+            ],
+            "attributes": {
+                "management_enabled" : 1,
+                "support_level": "Premium",
+                "support_type": "L1-L3",
+                "roles": "SP Server,SP Starter",
+                "addons": "ADDON3"
+            }
+        },
+        {
+            "name": "SP Additional Packages (R: SP Server)",
+            "id": "additional-sp-pkgs",
+            "type": "MKT",
+            "provided_products": [
+                "99006"
+            ],
+            "attributes": {
+                "management_enabled" : 1,
+                "role": "SP Server"
+            }
+        },
+        {
+            "name": "SP Server Bits",
+            "id": "99000",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false],
+                [11123, false],
+                [11125, false],
+                [11128, false],
+                [11126, false],
+                [11121, false]
+            ]
+        },
+        {
+            "name": "SP Starter Pack Bits",
+            "id": "99001",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false],
+                [11124, false],
+                [11123, false],
+                [11125, false]
+            ]
+        },
+        {
+            "name": "SP Addon 1 bits",
+            "id": "99003",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "SP Addon 2 bits",
+            "id": "99004",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false]
+            ]
+        },
+        {
+            "name": "SP Addon 3 bits",
+            "id": "99005",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false]
+            ]
+        },
+        {
+            "name": "SP Additional bits",
+            "id": "99006",
+            "version": "3.11",
+            "arch": "x86_64",
+            "attributes": {
+                "brand_type": "OS"
+            },
+            "content": [
+                [11113, false],
+                [100, false]
+            ]
+        }
+
+    ]
+}
+
