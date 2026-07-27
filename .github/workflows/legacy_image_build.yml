@@ -133,7 +133,7 @@ jobs:
           podman stop test-candlepin
 
       - name: Push to the registry
-        uses: redhat-actions/push-to-registry@v2
+        uses: redhat-actions/push-to-registry@v3
         if: inputs.push-image
         with:
           image: ${{ steps.build-image.outputs.image }}
