@@ -71,7 +71,7 @@ jobs:
           ansible-galaxy collection list
 
       - name: Initial build
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/buildah-build@v3
         with:
           image: cp_base
           containerfiles: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Build final image
         id: build-image
-        uses: redhat-actions/buildah-build@v2
+        uses: redhat-actions/buildah-build@v3
         with:
           image: ${{ env.IMAGE_NAME }}
           tags: ${{ inputs.update-latest && format('{0} {1}', steps.container-tag.outputs.tag, 'latest') || steps.container-tag.outputs.tag }}
