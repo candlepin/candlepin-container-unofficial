@@ -48,7 +48,15 @@ enabled=1
 REPOEOF
 
   PKG_MGR=$(command -v microdnf 2>/dev/null || command -v dnf 2>/dev/null || command -v yum 2>/dev/null)
-  $PKG_MGR --setopt=install_weak_deps=0 -y install $PROV_PKGS
+  # Install only from the provisioning repos we just added. The upstream image
+  # ships (or regenerates, via subscription-manager) entitlement repos such as
+  # "fake-content-*" whose file:// GPG keys do not exist yet, which would make
+  # the package manager fail while refreshing metadata.
+  $PKG_MGR --setopt=install_weak_deps=0 \
+    --disablerepo='*' \
+    --enablerepo='centos-provision-baseos' \
+    --enablerepo='centos-provision-appstream' \
+    -y install $PROV_PKGS
 }
 
 phase_wait_api() {
