@@ -42,6 +42,35 @@ script provided in this repository:
 $ ./configure-host.sh
 ```
 
+## Building the Images Locally
+
+All three images can be built with a single command:
+
+```console
+$ ./build.sh
+```
+
+This pulls the upstream Candlepin image, boots a throwaway PostgreSQL + app
+pair, imports the test data, bakes the yum repositories, commits the three
+images (`candlepin-app`, `candlepin-repo`, `candlepin-db`), runs a smoke
+test against them, and finally starts the `candlepin` pod from the freshly
+built images. Pass `--no-pod` to skip starting the pod.
+
+By default the test-data scripts are fetched by cloning
+[candlepin](https://github.com/candlepin/candlepin) (`main`). Common options:
+
+```console
+$ ./build.sh --candlepin-ref 5.0                 # use a different candlepin ref
+$ ./build.sh --deployment-dir ../candlepin/bin/deployment  # use a local checkout
+$ ./build.sh --no-test                           # skip the smoke test
+$ ./build.sh --no-pod                            # don't start the candlepin pod
+$ ./build.sh --push --registry ghcr.io/myuser    # build, test, then push
+```
+
+Run `./build.sh --help` for the full list of options. The GitHub Actions
+workflow (`.github/workflows/image_build.yml`) is a thin wrapper that simply
+logs in and calls this script.
+
 ## GitHub Actions Services
 
 GitHub Actions services use Docker networking (not pods), so the DB
