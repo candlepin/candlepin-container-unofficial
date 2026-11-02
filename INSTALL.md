@@ -88,17 +88,29 @@ upstream candlepin project uses the same mechanism in its own
 
 ## Building
 
-The GitHub Actions workflow (`image_build.yml`) pulls the official
-upstream image, provisions test data at build time, and commits the result:
+All three images are built by `build.sh` — see [Building the Images
+Locally](README.md#building-the-images-locally) in the README for the available
+options. The script pulls the official upstream image, provisions test data at
+build time, and commits the result:
 
 1. Pull `quay.io/candlepin/candlepin:dev-latest`
 2. Build `candlepin-db` from `Containerfile.db`
 3. Boot both on a shared network
-4. Run `provision.sh` (imports test data, create repos)
+4. Run `provision.sh` (imports test data, creates repos)
 5. Create `candlepin-repo` container with test yum repos
 6. Commit all containers
-7. Test the committed images
-8. Push to `ghcr.io/candlepin/`
+7. Smoke-test the committed images (on an internal network, no host ports)
+8. Optionally push to `ghcr.io/candlepin/`
+
+To build and test everything locally:
+
+```console
+$ ./build.sh
+```
+
+The GitHub Actions workflow (`image_build.yml`) is a thin wrapper around
+`build.sh`: it logs in to ghcr.io and runs the script with the inputs chosen
+in the workflow dispatch form.
 
 > **Warning**: Default credentials (`admin:admin`, `candlepin:candlepin`)
 > are for testing only.

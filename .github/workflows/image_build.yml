@@ -69,7 +69,7 @@ jobs:
             --registry "ghcr.io/${{ github.repository_owner }}" \
             --no-pod \
             ${{ inputs.tag && format('--tag {0}', inputs.tag) || '' }} \
-            ${{ inputs.update-latest && '' || '--no-latest' }} \
+            ${{ inputs.update-latest == false && '--no-latest' || '' }} \
             ${{ inputs.push-image && '--push' || '' }}
 
       - name: Summary
