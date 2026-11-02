@@ -1,42 +1,9 @@
 #!/bin/bash
-# build.sh — Build (and optionally test/push) the three Candlepin test containers locally.
-#
-# Produces:
-#   candlepin-db    PostgreSQL with pre-baked schema + test data
-#   candlepin-app   Candlepin API with pre-baked test data (on top of the upstream image)
-#   candlepin-repo  Apache serving the generated test yum repositories
-#
-# The whole provisioning flow (boot DB + app on a network, import test data via
-# provision.sh, bake the repos, commit the images) lives here so the GitHub
-# workflow can be a thin wrapper around this script.
-#
-# Usage:
-#   ./build.sh [options]
-#
-# Options:
-#   --upstream-image IMG   Upstream candlepin image used as the app base
-#                          (default: quay.io/candlepin/candlepin:dev-latest)
-#   --httpd-image IMG      httpd base image for the repo container
-#                          (default: quay.io/hummingbird/httpd:latest)
-#   --candlepin-ref REF    candlepin git ref to fetch the test-data scripts from
-#                          (default: main). Ignored when --deployment-dir is set.
-#   --deployment-dir DIR   Use an existing bin/deployment directory instead of
-#                          cloning candlepin (e.g. a local candlepin checkout).
-#   --tag TAG              Image tag (default: derived from the upstream image's
-#                          org.opencontainers.image.version label, else "latest").
-#   --registry REG         Registry prefix used when pushing
-#                          (default: ghcr.io/candlepin).
-#   --no-latest            Do not also tag/push the ":latest" tag.
-#   --no-test              Skip the post-build smoke test.
-#   --no-pod               Do not start the candlepin pod from the built images.
-#   --push                 Push the built images to --registry (requires login).
-#   --keep                 Keep provisioning containers/network on exit (for debugging).
-#   -h, --help             Show this help.
-#
-# Examples:
-#   ./build.sh                                   # build + test, no push
-#   ./build.sh --deployment-dir ../candlepin/bin/deployment
-#   ./build.sh --push --registry ghcr.io/myuser  # build + test + push
+# build.sh — Build (and optionally test/push) the three Candlepin test containers
+# locally: candlepin-db, candlepin-app and candlepin-repo. Run with --help for
+# the full usage. The whole provisioning flow (boot DB + app on a network,
+# import test data via provision.sh, bake the repos, commit the images) lives
+# here so the GitHub workflow can be a thin wrapper around this script.
 
 # -E (errtrace) propagates the ERR trap into functions so on_error can report
 # the exact command that failed; the real work all happens inside functions.
@@ -88,6 +55,43 @@ log()  { echo -e "\033[1;34m==>\033[0m $*"; }
 warn() { echo -e "\033[1;33mWARN:\033[0m $*" >&2; }
 die()  { echo -e "\033[1;31mERROR:\033[0m $*" >&2; exit 1; }
 
+usage() {
+  cat <<EOF
+Build (and optionally test/push) the three Candlepin test containers locally:
+
+  candlepin-db    PostgreSQL with pre-baked schema + test data
+  candlepin-app   Candlepin API with pre-baked test data (on top of the upstream image)
+  candlepin-repo  Apache serving the generated test yum repositories
+
+Usage: $(basename "$0") [options]
+
+Options:
+  --upstream-image IMG   Upstream candlepin image used as the app base
+                         (default: quay.io/candlepin/candlepin:dev-latest)
+  --httpd-image IMG      httpd base image for the repo container
+                         (default: quay.io/hummingbird/httpd:latest)
+  --candlepin-ref REF    candlepin git ref to fetch the test-data scripts from
+                         (default: main). Ignored when --deployment-dir is set.
+  --deployment-dir DIR   Use an existing bin/deployment directory instead of
+                         cloning candlepin (e.g. a local candlepin checkout).
+  --tag TAG              Image tag (default: derived from the upstream image's
+                         org.opencontainers.image.version label, else "latest").
+  --registry REG         Registry prefix used when pushing
+                         (default: ghcr.io/candlepin).
+  --no-latest            Do not also tag/push the ":latest" tag.
+  --no-test              Skip the post-build smoke test.
+  --no-pod               Do not start the candlepin pod from the built images.
+  --push                 Push the built images to --registry (requires login).
+  --keep                 Keep provisioning containers/network on exit (for debugging).
+  -h, --help             Show this help.
+
+Examples:
+  ./build.sh                                   # build + test, no push
+  ./build.sh --deployment-dir ../candlepin/bin/deployment
+  ./build.sh --push --registry ghcr.io/myuser  # build + test + push
+EOF
+}
+
 # ---------------------------------------------------------------------------
 # Argument parsing
 # ---------------------------------------------------------------------------
@@ -104,7 +108,7 @@ while [ $# -gt 0 ]; do
     --no-pod)          CREATE_POD=0; shift ;;
     --push)            DO_PUSH=1; shift ;;
     --keep)            KEEP=1; shift ;;
-    -h|--help)         sed -n '2,39p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)         usage; exit 0 ;;
     *)                 die "Unknown option: $1 (try --help)" ;;
   esac
 done
@@ -132,7 +136,7 @@ cleanup() {
   if [ "$KEEP" -eq 1 ]; then
     warn "--keep set: leaving provisioning containers and network in place"
     warn "  containers: $DB_C $APP_C $REPO_C   network: $NET"
-    return
+    return "$rc"
   fi
   log "Cleaning up provisioning containers and network"
   podman rm -f "$APP_C" "$REPO_C" "$DB_C" >/dev/null 2>&1 || true
@@ -140,6 +144,9 @@ cleanup() {
   podman network rm -f "$NET" "$TEST_NET" >/dev/null 2>&1 || true
   podman rmi -f "${DB_IMAGE_NAME}:base" >/dev/null 2>&1 || true
   [ -n "$TMP_DIR" ] && rm -rf "$TMP_DIR"
+  # Propagate the status the script was exiting with; a failing command above
+  # (e.g. the "[ -n ... ] &&" when no temp dir was created) must not mask it.
+  return "$rc"
 }
 trap cleanup EXIT
 
@@ -289,6 +296,12 @@ teardown_test() {
   podman network rm -f "$TEST_NET" >/dev/null 2>&1 || true
 }
 
+# Run curl inside the app container so the smoke test stays entirely on
+# $TEST_NET and never binds (and possibly conflicts with) host ports.
+smoke_curl() {
+  podman exec "$TEST_APP_C" curl "$@"
+}
+
 smoke_test() {
   log "Smoke-testing the built images"
   teardown_test
@@ -296,15 +309,15 @@ smoke_test() {
 
   podman run -d --network "${TEST_NET}:alias=${DB_ALIAS}" --name "$TEST_DB_C" \
     "${DB_IMAGE_NAME}:${TAG}" >/dev/null
-  podman run -d --network "$TEST_NET" --name "$TEST_REPO_C" -p 8080:8080 \
+  podman run -d --network "$TEST_NET" --name "$TEST_REPO_C" \
     "${REPO_IMAGE_NAME}:${TAG}" >/dev/null
-  podman run -d --network "$TEST_NET" --name "$TEST_APP_C" -p 8443:8443 \
+  podman run -d --network "$TEST_NET" --name "$TEST_APP_C" \
     "${APP_IMAGE_NAME}:${TAG}" >/dev/null
 
   log "Waiting for Candlepin to come up..."
   local ready=0 i
   for i in $(seq 1 60); do
-    if curl -sf -k https://localhost:8443/candlepin/status >/dev/null 2>&1; then
+    if smoke_curl -sf -k https://localhost:8443/candlepin/status >/dev/null 2>&1; then
       ready=1
       break
     fi
@@ -315,14 +328,14 @@ smoke_test() {
     die "Candlepin failed to start during smoke test"
   fi
 
-  curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
-  curl -sfk -u admin:admin https://localhost:8443/candlepin/owners >/dev/null \
+  smoke_curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
+  smoke_curl -sfk -u admin:admin https://localhost:8443/candlepin/owners >/dev/null \
     || die "owners endpoint check failed"
-  curl --head -sf http://localhost:8080/RPM-GPG-KEY-candlepin >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/RPM-GPG-KEY-candlepin" >/dev/null \
     || die "GPG key check failed"
-  curl --head -sf http://localhost:8080/path/to/fake-content/38072-3902/repodata/repomd.xml >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "repo metadata check failed"
-  curl --head -sf http://localhost:8080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "owner repo metadata check failed"
   log "Smoke test passed"
 
