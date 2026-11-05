@@ -114,7 +114,6 @@ while [ $# -gt 0 ]; do
 done
 
 command -v podman >/dev/null || die "podman is not installed"
-command -v openssl >/dev/null || die "openssl is not installed (needed for the repo HTTPS cert)"
 
 # ---------------------------------------------------------------------------
 # Cleanup
@@ -255,7 +254,7 @@ build() {
   # port with candlepin-app (which uses 8443) inside the shared pod namespace:
   # HTTP -> 9080, HTTPS -> 9443. The stock image also gates its SSL vhost behind
   # <IfFile /etc/pki/tls/certs/localhost.crt> (absent by default, so HTTPS never
-  # binds), so we drop in a self-signed cert to activate it.
+  # binds), so we install candlepin's own TLS cert (below) to activate it.
   log "Reconfiguring repo httpd listeners (http:9080, https:9443)"
   local httpd_cfg
   httpd_cfg="$(mktemp -d)"
@@ -270,15 +269,21 @@ build() {
          "$httpd_cfg/ssl.conf"
   podman cp "$httpd_cfg/ssl.conf" "$REPO_C:/etc/httpd/conf.d/ssl.conf"
 
-  # Self-signed cert at the paths ssl.conf's <IfFile> / SSLCertificate* expect.
+  # Present candlepin-app's own TLS certificate so both services are reachable at
+  # https://candlepin (only the port differs) and validate against the same CA.
+  # candlepin-app uses its self-signed RSA "Server CA" cert directly as the TLS
+  # server cert (see server.xml SSLHostConfig); that cert carries SAN DNS:candlepin
+  # and is included in candlepin-ca-bundle.crt, so any client trusting the bundle
+  # trusts the repo too. We copy it to the paths the stock ssl.conf expects.
   # Mode 0644 so the apache user (the image's default USER) can read the key.
-  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
-    -keyout "$httpd_cfg/localhost.key" -out "$httpd_cfg/localhost.crt" \
-    -subj "/CN=candlepin" \
-    -addext "subjectAltName=DNS:candlepin,DNS:localhost" >/dev/null 2>&1
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.crt" "$httpd_cfg/localhost.crt"
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.key" "$httpd_cfg/localhost.key"
   chmod 0644 "$httpd_cfg/localhost.key" "$httpd_cfg/localhost.crt"
   podman cp "$httpd_cfg/localhost.crt" "$REPO_C:/etc/pki/tls/certs/localhost.crt"
   podman cp "$httpd_cfg/localhost.key" "$REPO_C:/etc/pki/tls/private/localhost.key"
+  # The CA bundle, so the repo can serve the same trust anchor candlepin publishes.
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-ca-bundle.crt" \
+    "$REPO_C:/etc/pki/tls/certs/candlepin-ca-bundle.crt"
 
   rm -rf "$httpd_cfg"
 
