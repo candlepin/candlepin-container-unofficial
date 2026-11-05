@@ -114,6 +114,7 @@ while [ $# -gt 0 ]; do
 done
 
 command -v podman >/dev/null || die "podman is not installed"
+command -v openssl >/dev/null || die "openssl is not installed (needed for the repo HTTPS cert)"
 
 # ---------------------------------------------------------------------------
 # Cleanup
@@ -246,8 +247,40 @@ build() {
 
   log "Copying generated repos into repo container"
   # create_test_repos.py writes the repos into Tomcat's ROOT webapp; the
-  # hummingbird httpd image serves /var/www/html on port 8080.
+  # hummingbird httpd image serves /var/www/html (HTTP on 9080, HTTPS on 9443
+  # after the reconfiguration below).
   podman cp "$APP_C:/var/lib/tomcat/webapps/ROOT/." "$REPO_C:/var/www/html/"
+
+  # Relocate the repo's listeners off the default 8080/8443 so it never shares a
+  # port with candlepin-app (which uses 8443) inside the shared pod namespace:
+  # HTTP -> 9080, HTTPS -> 9443. The stock image also gates its SSL vhost behind
+  # <IfFile /etc/pki/tls/certs/localhost.crt> (absent by default, so HTTPS never
+  # binds), so we drop in a self-signed cert to activate it.
+  log "Reconfiguring repo httpd listeners (http:9080, https:9443)"
+  local httpd_cfg
+  httpd_cfg="$(mktemp -d)"
+
+  podman cp "$REPO_C:/etc/httpd/conf/httpd.conf" "$httpd_cfg/httpd.conf"
+  sed -i 's/^Listen 8080$/Listen 9080/' "$httpd_cfg/httpd.conf"
+  podman cp "$httpd_cfg/httpd.conf" "$REPO_C:/etc/httpd/conf/httpd.conf"
+
+  podman cp "$REPO_C:/etc/httpd/conf.d/ssl.conf" "$httpd_cfg/ssl.conf"
+  sed -i -e 's/^Listen 8443 https$/Listen 9443 https/' \
+         -e 's/<VirtualHost _default_:8443>/<VirtualHost _default_:9443>/' \
+         "$httpd_cfg/ssl.conf"
+  podman cp "$httpd_cfg/ssl.conf" "$REPO_C:/etc/httpd/conf.d/ssl.conf"
+
+  # Self-signed cert at the paths ssl.conf's <IfFile> / SSLCertificate* expect.
+  # Mode 0644 so the apache user (the image's default USER) can read the key.
+  openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+    -keyout "$httpd_cfg/localhost.key" -out "$httpd_cfg/localhost.crt" \
+    -subj "/CN=candlepin" \
+    -addext "subjectAltName=DNS:candlepin,DNS:localhost" >/dev/null 2>&1
+  chmod 0644 "$httpd_cfg/localhost.key" "$httpd_cfg/localhost.crt"
+  podman cp "$httpd_cfg/localhost.crt" "$REPO_C:/etc/pki/tls/certs/localhost.crt"
+  podman cp "$httpd_cfg/localhost.key" "$REPO_C:/etc/pki/tls/private/localhost.key"
+
+  rm -rf "$httpd_cfg"
 
   log "Provision: copy generated certs"
   podman exec --user root "$APP_C" /opt/provision.sh copy-certs
@@ -270,7 +303,7 @@ build() {
     "$APP_C" "${APP_IMAGE_NAME}:${TAG}"
 
   podman commit \
-    --change='EXPOSE 8080' \
+    --change='EXPOSE 9080 9443' \
     "$REPO_C" "${REPO_IMAGE_NAME}:${TAG}"
 
   podman commit \
@@ -331,12 +364,14 @@ smoke_test() {
   smoke_curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
   smoke_curl -sfk -u admin:admin https://localhost:8443/candlepin/owners >/dev/null \
     || die "owners endpoint check failed"
-  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/RPM-GPG-KEY-candlepin" >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:9080/RPM-GPG-KEY-candlepin" >/dev/null \
     || die "GPG key check failed"
-  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:9080/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "repo metadata check failed"
-  smoke_curl --head -sf "http://${TEST_REPO_C}:8080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
+  smoke_curl --head -sf "http://${TEST_REPO_C}:9080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "owner repo metadata check failed"
+  smoke_curl --head -sfk "https://${TEST_REPO_C}:9443/RPM-GPG-KEY-candlepin" >/dev/null \
+    || die "repo HTTPS (9443) check failed"
   log "Smoke test passed"
 
   teardown_test

@@ -88,7 +88,8 @@ services:
   candlepin-repo:
     image: ghcr.io/candlepin/candlepin-repo:latest
     ports:
-      - 8080:8080
+      - 9080:9080
+      - 9443:9443
 ```
 
 ## What These Images Add
@@ -100,8 +101,9 @@ empty database. These images layer pre-provisioned test data on top:
   `test_data.json`
 - **Products, subscriptions, and pools** for all owners
 - **Yum repos** with installable test RPMs (`slow-eagle`, `tricky-frog`,
-  `awesome-rabbit`, etc.) served via Tomcat on port 8080
-- **RPM GPG key** at `http://candlepin:8080/RPM-GPG-KEY-candlepin`
+  `awesome-rabbit`, etc.) served by the repo container on port 9080 (HTTP)
+  and 9443 (HTTPS)
+- **RPM GPG key** at `http://candlepin:9080/RPM-GPG-KEY-candlepin`
 - **Generated product certificates** embedded in repo metadata
 
 ## Ports
@@ -109,7 +111,8 @@ empty database. These images layer pre-provisioned test data on top:
 | Port | Protocol | Service |
 |------|----------|---------|
 | 8443 | HTTPS | Candlepin API |
-| 8080 | HTTP | Candlepin API + test yum repos |
+| 9080 | HTTP | Test yum repos |
+| 9443 | HTTPS | Test yum repos |
 | 5432 | TCP | PostgreSQL |
 
 ## Test Accounts

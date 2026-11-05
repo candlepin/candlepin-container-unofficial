@@ -19,7 +19,8 @@ podman run -d --network candlepin-net --name candlepin \
   ghcr.io/candlepin/candlepin-app:latest
 
 podman run -d --network candlepin-net --name candlepin-repo \
-  -p 8080:8080 \
+  -p 9080:9080 \
+  -p 9443:9443 \
   ghcr.io/candlepin/candlepin-repo:latest
 
 # Verify (wait ~30s for startup)
@@ -61,13 +62,13 @@ $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
-  --rhsm.baseurl http://candlepin:8080
+  --rhsm.baseurl http://candlepin:9080
 ```
 
 To install packages from the test RPM repository, import the GPG key:
 
 ```console
-$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin http://candlepin:8080/RPM-GPG-KEY-candlepin
+$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin http://candlepin:9080/RPM-GPG-KEY-candlepin
 ```
 
 ## Overriding the database hostname
