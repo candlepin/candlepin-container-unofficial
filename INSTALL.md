@@ -62,13 +62,13 @@ $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
-  --rhsm.baseurl http://candlepin:9080
+  --rhsm.baseurl https://candlepin:9443
 ```
 
 To install packages from the test RPM repository, import the GPG key:
 
 ```console
-$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin http://candlepin:9080/RPM-GPG-KEY-candlepin
+$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin https://candlepin:9443/RPM-GPG-KEY-candlepin
 ```
 
 ## Overriding the database hostname
