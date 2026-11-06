@@ -19,7 +19,8 @@ podman run -d --network candlepin-net --name candlepin \
   ghcr.io/candlepin/candlepin-app:latest
 
 podman run -d --network candlepin-net --name candlepin-repo \
-  -p 8080:8080 \
+  -p 9080:9080 \
+  -p 9443:9443 \
   ghcr.io/candlepin/candlepin-repo:latest
 
 # Verify (wait ~30s for startup)
@@ -61,13 +62,18 @@ $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
-  --rhsm.baseurl http://candlepin:8080
+  --rhsm.baseurl https://candlepin:9443 \
+  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-ca-bundle.pem
 ```
+
+`repo_ca_cert` is written as `sslcacert` into the generated repo files, so
+the test repos served over HTTPS validate against the Candlepin CA imported
+above.
 
 To install packages from the test RPM repository, import the GPG key:
 
 ```console
-$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin http://candlepin:8080/RPM-GPG-KEY-candlepin
+$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin https://candlepin:9443/RPM-GPG-KEY-candlepin
 ```
 
 ## Overriding the database hostname

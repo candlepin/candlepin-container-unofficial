@@ -20,11 +20,44 @@
 
 set -euo pipefail
 
-CONTAINER="${1:-candlepin-candlepin-app}"
+usage() {
+  cat <<EOF
+Configure the host system to use Candlepin running in the pod.
+
+Usage: $(basename "$0") [options] [container]
+
+Arguments:
+  container    Name of the candlepin-app container
+               (default: candlepin-candlepin-app, the name podman gives it in
+               the pod; use "candlepin" for the container network setup).
+
+Options:
+  -h, --help   Show this help.
+
+This script:
+  1. Adds candlepin to /etc/hosts
+  2. Installs Candlepin's CA certificate into /etc/rhsm/ca and the system
+     trust store
+  3. Configures subscription-manager to use the Candlepin server and test repos
+  4. Imports the GPG key of the test RPM repository
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+CONTAINER="candlepin-candlepin-app"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help)  usage; exit 0 ;;
+    -*)         echo "ERROR: Unknown option: $1 (try --help)" >&2; exit 1 ;;
+    *)          CONTAINER="$1"; shift ;;
+  esac
+done
 CP_HOSTNAME="candlepin"
 CP_PORT=8443
 CP_PREFIX="/candlepin"
-REPO_URL="http://${CP_HOSTNAME}:8080"
+REPO_URL="https://${CP_HOSTNAME}:9443"
 CA_CRT_FILE_NAME="candlepin-ca-bundle.crt"
 CA_FILE_NAME=${CA_CRT_FILE_NAME%.crt}.pem
 CA_PATH="/etc/rhsm/ca/${CA_FILE_NAME}"
@@ -81,11 +114,15 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "[4/5] Configuring subscription-manager..."
+# repo_ca_cert is written as sslcacert into the generated repo files, so the
+# test repos served over HTTPS by candlepin-repo validate against the same
+# Candlepin CA we installed above.
 sudo subscription-manager config \
   --server.hostname "$CP_HOSTNAME" \
   --server.port "$CP_PORT" \
   --server.prefix "$CP_PREFIX" \
-  --rhsm.baseurl "$REPO_URL"
+  --rhsm.baseurl "$REPO_URL" \
+  --rhsm.repo_ca_cert "$CA_PATH"
 
 echo "[5/5] Importing GPG key of the test RPM repository..."
 curl -sSf -o "${TMP_DIR}/RPM-GPG-KEY-candlepin" "${REPO_URL}/RPM-GPG-KEY-candlepin"
