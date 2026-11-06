@@ -62,8 +62,13 @@ $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
-  --rhsm.baseurl https://candlepin:9443
+  --rhsm.baseurl https://candlepin:9443 \
+  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-ca-bundle.pem
 ```
+
+`repo_ca_cert` is written as `sslcacert` into the generated repo files, so
+the test repos served over HTTPS validate against the Candlepin CA imported
+above.
 
 To install packages from the test RPM repository, import the GPG key:
 
