@@ -125,7 +125,8 @@ if [ "$RESTORE_SUBMAN" -eq 1 ]; then
       --remove=server.hostname \
       --remove=server.port \
       --remove=server.prefix \
-      --remove=rhsm.baseurl || true
+      --remove=rhsm.baseurl \
+      --remove=rhsm.repo_ca_cert || true
     echo "  reset"
   else
     echo "  subscription-manager not installed, skipping"
