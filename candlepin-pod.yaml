@@ -32,6 +32,16 @@ spec:
           value: jdbc:postgresql://localhost/candlepin
         - name: ORG_QUARTZ_DATASOURCE_MYDS_URL
           value: jdbc:postgresql://localhost/candlepin
+      # candlepin-app serves plain HTTP on 8080 (consumed by candlepin-proxy) and
+      # keeps its own TLS connector on the internal port 8444 for direct access.
+      # The public HTTPS endpoint (8443) is owned by candlepin-proxy below.
+
+    # candlepin-proxy terminates client TLS with an RSA certificate in front of
+    # candlepin-app. This works around a Go 1.27+ regression where clients fail the
+    # TLS handshake against candlepin's ML-DSA server certificate, while still
+    # forwarding the client certificate so mutual-TLS auth keeps working.
+    - name: candlepin-proxy
+      image: ghcr.io/candlepin/candlepin-proxy:latest
       ports:
         - containerPort: 8443
           hostPort: 8443
