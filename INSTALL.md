@@ -14,12 +14,23 @@ podman network create candlepin-net
 podman run -d --network candlepin-net --name postgres \
   ghcr.io/candlepin/candlepin-db:latest
 
+# candlepin-app serves HTTP on 8080 (for the proxy) and its own TLS on the
+# internal port 8444; it no longer publishes 8443 directly. candlepin-proxy
+# shares this container's network namespace, so publish the public HTTPS port
+# (8443) here, on the namespace owner.
 podman run -d --network candlepin-net --name candlepin \
   -p 8443:8443 \
   ghcr.io/candlepin/candlepin-app:latest
 
+# candlepin-proxy terminates public TLS on 8443 and forwards to candlepin-app
+# over HTTP. It reaches candlepin on 127.0.0.1:8080 via the shared namespace
+# (see proxy/candlepin.conf to point proxy_pass elsewhere).
+podman run -d --network container:candlepin --name candlepin-proxy \
+  ghcr.io/candlepin/candlepin-proxy:latest
+
 podman run -d --network candlepin-net --name candlepin-repo \
-  -p 8080:8080 \
+  -p 9080:9080 \
+  -p 9443:9443 \
   ghcr.io/candlepin/candlepin-repo:latest
 
 # Verify (wait ~30s for startup)
@@ -61,13 +72,18 @@ $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
-  --rhsm.baseurl http://candlepin:8080
+  --rhsm.baseurl https://candlepin:9443 \
+  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-ca-bundle.pem
 ```
+
+`repo_ca_cert` is written as `sslcacert` into the generated repo files, so
+the test repos served over HTTPS validate against the Candlepin CA imported
+above.
 
 To install packages from the test RPM repository, import the GPG key:
 
 ```console
-$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin http://candlepin:8080/RPM-GPG-KEY-candlepin
+$ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin https://candlepin:9443/RPM-GPG-KEY-candlepin
 ```
 
 ## Overriding the database hostname
@@ -88,7 +104,7 @@ upstream candlepin project uses the same mechanism in its own
 
 ## Building
 
-All three images are built by `build.sh` — see [Building the Images
+All four images are built by `build.sh` — see [Building the Images
 Locally](README.md#building-the-images-locally) in the README for the available
 options. The script pulls the official upstream image, provisions test data at
 build time, and commits the result:
@@ -98,9 +114,12 @@ build time, and commits the result:
 3. Boot both on a shared network
 4. Run `provision.sh` (imports test data, creates repos)
 5. Create `candlepin-repo` container with test yum repos
-6. Commit all containers
-7. Smoke-test the committed images (on an internal network, no host ports)
-8. Optionally push to `ghcr.io/candlepin/`
+6. Configure candlepin-app's `server.xml` for reverse-proxy TLS termination
+   (move its TLS connector to 8444, add SSLValve/RemoteIpValve) and build
+   `candlepin-proxy` from `proxy/Containerfile` with candlepin's RSA cert
+7. Commit all containers
+8. Smoke-test the committed images (on an internal network, no host ports)
+9. Optionally push to `ghcr.io/candlepin/`
 
 To build and test everything locally:
 

@@ -1,0 +1,3 @@
+# Certs staged into the proxy build context at build time (copied from the
+# provisioned candlepin-app container by build.sh).
+/proxy/certs/

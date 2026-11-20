@@ -1,0 +1,30 @@
+# candlepin-proxy — nginx TLS-terminating reverse proxy for candlepin-app.
+#
+# WARNING: This image is for TESTING ONLY. It bakes in candlepin's test server
+# certificate/key and CA bundle. Do NOT use in production.
+#
+# See proxy/candlepin.conf for the rationale (works around a Go 1.27+ ML-DSA TLS
+# handshake regression by terminating TLS with an RSA certificate, while still
+# forwarding the client certificate so candlepin's mutual-TLS auth keeps working).
+#
+# Based on the Red Hat Hardened Images (Project Hummingbird) nginx, matching the
+# base used by candlepin-db (PostgreSQL) and candlepin-repo (httpd). The image is
+# minimal/distroless (no shell) and runs unprivileged (uid 65532), so the server
+# block is installed as a conf.d drop-in on top of the stock nginx.conf. We copy
+# it over the stock conf.d/default.conf (which listens on 8080) to replace it
+# without needing a RUN step.
+#
+# build.sh stages the three cert files into the build context (proxy/certs/)
+# from the freshly provisioned candlepin-app container before building this image.
+
+FROM quay.io/hummingbird/nginx:latest
+
+# Replace the stock conf.d/default.conf (which serves on 8080) with our TLS
+# terminating reverse-proxy server block.
+COPY candlepin.conf /etc/nginx/conf.d/default.conf
+
+COPY certs/candlepin-rsa-ca.crt     /etc/nginx/certs/candlepin-rsa-ca.crt
+COPY certs/candlepin-rsa-ca.key     /etc/nginx/certs/candlepin-rsa-ca.key
+COPY certs/candlepin-ca-bundle.crt  /etc/nginx/certs/candlepin-ca-bundle.crt
+
+EXPOSE 8443

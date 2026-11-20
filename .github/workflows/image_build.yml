@@ -79,6 +79,7 @@ jobs:
           echo "Images built for base \`${{ inputs.upstream-image || 'quay.io/candlepin/candlepin:dev-latest' }}\`:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- ghcr.io/${{ github.repository_owner }}/candlepin-app" >> $GITHUB_STEP_SUMMARY
+          echo "- ghcr.io/${{ github.repository_owner }}/candlepin-proxy" >> $GITHUB_STEP_SUMMARY
           echo "- ghcr.io/${{ github.repository_owner }}/candlepin-repo" >> $GITHUB_STEP_SUMMARY
           echo "- ghcr.io/${{ github.repository_owner }}/candlepin-db" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

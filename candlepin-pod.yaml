@@ -6,7 +6,8 @@
 #
 # The containers share the pod's network namespace, so Candlepin reaches
 # PostgreSQL at localhost:5432 and the repo server is available at
-# localhost:8080. Two environment variables override the db_host=postgres
+# localhost:9080 (HTTP) / localhost:9443 (HTTPS). Two environment variables
+# override the db_host=postgres
 # default baked into candlepin.conf (SmallRye Config env vars have ordinal
 # 300, which beats the config file at 225).
 
@@ -31,6 +32,16 @@ spec:
           value: jdbc:postgresql://localhost/candlepin
         - name: ORG_QUARTZ_DATASOURCE_MYDS_URL
           value: jdbc:postgresql://localhost/candlepin
+      # candlepin-app serves plain HTTP on 8080 (consumed by candlepin-proxy) and
+      # keeps its own TLS connector on the internal port 8444 for direct access.
+      # The public HTTPS endpoint (8443) is owned by candlepin-proxy below.
+
+    # candlepin-proxy terminates client TLS with an RSA certificate in front of
+    # candlepin-app. This works around a Go 1.27+ regression where clients fail the
+    # TLS handshake against candlepin's ML-DSA server certificate, while still
+    # forwarding the client certificate so mutual-TLS auth keeps working.
+    - name: candlepin-proxy
+      image: ghcr.io/candlepin/candlepin-proxy:latest
       ports:
         - containerPort: 8443
           hostPort: 8443
@@ -39,6 +50,9 @@ spec:
     - name: candlepin-repo
       image: ghcr.io/candlepin/candlepin-repo:latest
       ports:
-        - containerPort: 8080
-          hostPort: 8080
+        - containerPort: 9080
+          hostPort: 9080
+          protocol: TCP
+        - containerPort: 9443
+          hostPort: 9443
           protocol: TCP
