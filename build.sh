@@ -375,7 +375,10 @@ smoke_test() {
     || die "repo metadata check failed"
   smoke_curl --head -sf "http://${TEST_REPO_C}:9080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "owner repo metadata check failed"
-  smoke_curl --head -sfk "https://${TEST_REPO_C}:9443/RPM-GPG-KEY-candlepin" >/dev/null \
+  smoke_curl --head -sf \
+    --cacert /etc/candlepin/certs/candlepin-ca-bundle.crt \
+    --connect-to "candlepin:9443:${TEST_REPO_C}:9443" \
+    "https://candlepin:9443/RPM-GPG-KEY-candlepin" >/dev/null \
     || die "repo HTTPS (9443) check failed"
   log "Smoke test passed"
 
