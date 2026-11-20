@@ -12,7 +12,8 @@
 # 1. The "127.0.0.1 candlepin" entry added to /etc/hosts
 # 2. The Candlepin CA certificate installed into /etc/rhsm/ca and the
 #    system trust store (anchor symlink + update-ca-trust)
-# 3. The subscription-manager server/repo configuration (reset to defaults)
+# 3. The subscription-manager server/repo configuration (restore previous
+#    values saved by configure-host.sh)
 # 4. The imported test RPM repository GPG key
 #
 # Each step can be skipped with its --keep-* option (see --help).
@@ -38,12 +39,22 @@ Options:
                        /etc/hosts.
   --keep-ca-cert       Do not remove the Candlepin CA certificate from
                        /etc/rhsm/ca and the system trust store.
-  --keep-subman        Do not reset the subscription-manager configuration.
+  --keep-subman        Do not restore the subscription-manager configuration.
   --keep-gpg-key       Do not remove the test RPM repository GPG key.
   -h, --help           Show this help.
 
 With no options every change is reverted. Each step is skipped automatically
 if the change is not present, so the script is safe to run repeatedly.
+
+The subscription-manager configuration is restored from
+\${CANDLEPIN_TEST_STATE_DIR:-\${XDG_STATE_HOME:-\$HOME/.local/state}/candlepin-test}/subscription-manager.conf.bak
+created by configure-host.sh. A legacy path /var/lib/candlepin-test is also
+checked for backward compatibility.
+
+Environment:
+  CANDLEPIN_TEST_STATE_DIR  Directory for subscription-manager backup
+                            (default: \${XDG_STATE_HOME:-\$HOME/.local/state}/candlepin-test)
+  XDG_STATE_HOME            Base directory for state files (default: \$HOME/.local/state)
 EOF
 }
 
@@ -118,16 +129,65 @@ fi
 # 3. subscription-manager
 # ---------------------------------------------------------------------------
 if [ "$RESTORE_SUBMAN" -eq 1 ]; then
-  echo "[3/4] Resetting subscription-manager configuration to defaults..."
+  echo "[3/4] Restoring subscription-manager configuration..."
   if command -v subscription-manager > /dev/null; then
-    # --remove resets each option to its built-in default.
-    sudo subscription-manager config \
-      --remove=server.hostname \
-      --remove=server.port \
-      --remove=server.prefix \
-      --remove=rhsm.baseurl \
-      --remove=rhsm.repo_ca_cert || true
-    echo "  reset"
+    if [ -n "${CANDLEPIN_TEST_STATE_DIR:-}" ]; then
+      STATE_DIR="$CANDLEPIN_TEST_STATE_DIR"
+    else
+      if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+        _USER_HOME="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+        [ -z "${_USER_HOME:-}" ] && _USER_HOME="$HOME"
+      else
+        _USER_HOME="$HOME"
+      fi
+      STATE_DIR="${XDG_STATE_HOME:-$_USER_HOME/.local/state}/candlepin-test"
+      unset _USER_HOME
+    fi
+    STATE_FILE="$STATE_DIR/subscription-manager.conf.bak"
+    # Check both new (home) and legacy (/var/lib) locations for backward compatibility
+    if [ ! -f "$STATE_FILE" ] && [ -f "/var/lib/candlepin-test/subscription-manager.conf.bak" ]; then
+      STATE_DIR="/var/lib/candlepin-test"
+      STATE_FILE="$STATE_DIR/subscription-manager.conf.bak"
+      echo "  found legacy backup at $STATE_FILE (migrating to home directory on next configure)"
+    fi
+    if [ -f "$STATE_FILE" ]; then
+      echo "  restoring from $STATE_FILE..."
+      restore_failed=0
+      while IFS='|' read -r key value is_default; do
+        [[ -z "$key" || "$key" == \#* ]] && continue
+        if [ "$is_default" = "1" ]; then
+          echo "  restoring $key to default"
+          if ! sudo subscription-manager config --remove="$key"; then
+            echo "ERROR: failed to restore $key to default" >&2
+            restore_failed=1
+          fi
+        else
+          echo "  restoring $key=$value"
+          if ! sudo subscription-manager config --"$key"="$value"; then
+            echo "ERROR: failed to restore $key=$value" >&2
+            restore_failed=1
+          fi
+        fi
+      done < <(cat "$STATE_FILE" 2>/dev/null || sudo cat "$STATE_FILE" 2>/dev/null || true)
+      if [ "$restore_failed" -ne 0 ]; then
+        echo "  restore failed for one or more keys (see errors above)" >&2
+        exit 1
+      fi
+      echo "  resulting configuration:"
+      sudo subscription-manager config --list 2>/dev/null | grep -E "^\[server\]|^\[rhsm\]|hostname|port|prefix|baseurl|repo_ca_cert" || true
+      rm -f "$STATE_FILE" 2>/dev/null || sudo rm -f "$STATE_FILE" 2>/dev/null || true
+      rmdir "$STATE_DIR" 2>/dev/null || sudo rmdir "$STATE_DIR" 2>/dev/null || true
+      echo "  restored"
+    else
+      echo "  no backup file found, skipping"
+      echo "  (looked in \${CANDLEPIN_TEST_STATE_DIR:-\${XDG_STATE_HOME:-\$HOME/.local/state}/candlepin-test}/subscription-manager.conf.bak"
+      echo "   and /var/lib/candlepin-test/subscription-manager.conf.bak)"
+      echo "  (previous configuration was not saved by configure-host.sh;"
+      echo "   to reset to Red Hat defaults manually, run:"
+      echo "   sudo subscription-manager config --remove=server.hostname"
+      echo "     --remove=server.port --remove=server.prefix"
+      echo "     --remove=rhsm.baseurl --remove=rhsm.repo_ca_cert)"
+    fi
   else
     echo "  subscription-manager not installed, skipping"
   fi
