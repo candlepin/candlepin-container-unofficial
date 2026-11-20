@@ -27,6 +27,7 @@ KEEP=0
 APP_IMAGE_NAME="candlepin-app"
 REPO_IMAGE_NAME="candlepin-repo"
 DB_IMAGE_NAME="candlepin-db"
+PROXY_IMAGE_NAME="candlepin-proxy"
 
 # Build-scoped names (prefixed so we never clobber the user's own containers).
 NET="cpbuild-net"
@@ -42,6 +43,7 @@ TEST_NET="cpbuild-test-net"
 TEST_DB_C="cpbuild-test-db"
 TEST_APP_C="cpbuild-test-app"
 TEST_REPO_C="cpbuild-test-repo"
+TEST_PROXY_C="cpbuild-test-proxy"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 POD_FILE="$SCRIPT_DIR/candlepin-pod.yaml"
@@ -140,7 +142,8 @@ cleanup() {
   fi
   log "Cleaning up provisioning containers and network"
   podman rm -f "$APP_C" "$REPO_C" "$DB_C" >/dev/null 2>&1 || true
-  podman rm -f "$TEST_APP_C" "$TEST_REPO_C" "$TEST_DB_C" >/dev/null 2>&1 || true
+  podman rm -f "$TEST_APP_C" "$TEST_REPO_C" "$TEST_DB_C" "$TEST_PROXY_C" >/dev/null 2>&1 || true
+  rm -rf "$SCRIPT_DIR/proxy/certs" >/dev/null 2>&1 || true
   podman network rm -f "$NET" "$TEST_NET" >/dev/null 2>&1 || true
   podman rmi -f "${DB_IMAGE_NAME}:base" >/dev/null 2>&1 || true
   [ -n "$TMP_DIR" ] && rm -rf "$TMP_DIR"
@@ -293,6 +296,77 @@ build() {
   log "Provision: cleanup"
   podman exec --user root "$APP_C" /opt/provision.sh cleanup
 
+  # Enable reverse-proxy TLS termination support in Tomcat. The candlepin-proxy
+  # (nginx) container terminates the client's TLS connection with an RSA cert and
+  # forwards requests to candlepin over plain HTTP (8080). This sidesteps a Go
+  # 1.27+ regression: Go advertises ML-DSA in signature_algorithms but omits it
+  # from signature_algorithms_cert, so when Tomcat's OpenSSL provider selects the
+  # ML-DSA server cert (candlepin offers both ML-DSA and RSA) the handshake fails
+  # with "no suitable signature algorithm". nginx only ever presents the RSA cert.
+  #
+  # To keep candlepin's mutual-TLS auth working through the proxy, SSLValve turns
+  # the forwarded ssl_client_escaped_cert header back into the
+  # jakarta.servlet.request.X509Certificate attribute that candlepin's SSLAuth
+  # reads, and RemoteIpValve restores the https scheme from X-Forwarded-Proto.
+  log "Provision: configure server.xml for reverse proxy (valves + move TLS to 8444)"
+  podman exec --user root "$APP_C" python3 - <<'PY'
+import re, sys
+
+path = "/opt/tomcat/conf/server.xml"
+with open(path) as f:
+    xml = f.read()
+
+changed = False
+
+# 1) Move candlepin's own HTTPS connector off the public port 8443 to an internal
+#    port 8444, so the candlepin-proxy (nginx) can own 8443. The proxy forwards to
+#    candlepin over plain HTTP (8080); the 8444 TLS connector (with both the RSA
+#    and ML-DSA certs) stays available for direct access and debugging.
+if 'port="8443"' in xml:
+    xml = xml.replace('port="8443"', 'port="8444"', 1)
+    changed = True
+# Keep the HTTP connector's redirectPort consistent with the moved TLS port.
+if 'redirectPort="8443"' in xml:
+    xml = xml.replace('redirectPort="8443"', 'redirectPort="8444"')
+    changed = True
+
+# 2) Add RemoteIpValve + SSLValve so candlepin still sees the request as HTTPS and
+#    can read the client certificate the proxy forwards (as ssl_client_escaped_cert).
+if "org.apache.catalina.valves.SSLValve" not in xml:
+    access_valve = '<Valve className="org.apache.catalina.valves.AccessLogValve"'
+    if access_valve not in xml:
+        sys.exit("server.xml: could not find AccessLogValve to anchor the insertion")
+    valves = (
+        '<Valve className="org.apache.catalina.valves.RemoteIpValve"\n'
+        '               protocolHeader="X-Forwarded-Proto"\n'
+        '               internalProxies=".*" />\n'
+        '        <Valve className="org.apache.catalina.valves.SSLValve" />\n'
+        '        '
+    )
+    xml = xml.replace(access_valve, valves + access_valve, 1)
+    changed = True
+
+if not changed:
+    print("server.xml: already configured for reverse proxy, nothing to do")
+    sys.exit(0)
+
+with open(path, "w") as f:
+    f.write(xml)
+print("server.xml: TLS connector moved to 8444 and reverse-proxy valves added")
+PY
+
+  log "Building candlepin-proxy image (nginx TLS terminator)"
+  # Stage the certs the proxy needs (RSA server cert/key for TLS termination and
+  # the CA bundle for client-cert verification) from the provisioned app
+  # container into the proxy build context, then build the image.
+  local proxy_ctx="$SCRIPT_DIR/proxy"
+  mkdir -p "$proxy_ctx/certs"
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.crt"    "$proxy_ctx/certs/candlepin-rsa-ca.crt"
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.key"    "$proxy_ctx/certs/candlepin-rsa-ca.key"
+  podman cp "$APP_C:/etc/candlepin/certs/candlepin-ca-bundle.crt" "$proxy_ctx/certs/candlepin-ca-bundle.crt"
+  podman build -f "$proxy_ctx/Containerfile" -t "${PROXY_IMAGE_NAME}:${TAG}" "$proxy_ctx"
+  rm -rf "$proxy_ctx/certs"
+
   log "Stopping containers gracefully"
   podman exec --user root "$APP_C" /opt/tomcat/bin/shutdown.sh 2>/dev/null || true
   sleep 5
@@ -304,7 +378,7 @@ build() {
     --change='USER tomcat' \
     --change='WORKDIR /opt/tomcat/bin' \
     --change='ENTRYPOINT ["sh", "-c", "rm -rf /opt/tomcat/webapps/candlepin && /opt/tomcat/bin/catalina.sh run"]' \
-    --change='EXPOSE 8443' \
+    --change='EXPOSE 8080 8444' \
     "$APP_C" "${APP_IMAGE_NAME}:${TAG}"
 
   podman commit \
@@ -320,9 +394,10 @@ build() {
 
   if [ "$UPDATE_LATEST" -eq 1 ] && [ "$TAG" != "latest" ]; then
     log "Tagging :latest"
-    podman tag "${APP_IMAGE_NAME}:${TAG}"  "${APP_IMAGE_NAME}:latest"
-    podman tag "${REPO_IMAGE_NAME}:${TAG}" "${REPO_IMAGE_NAME}:latest"
-    podman tag "${DB_IMAGE_NAME}:${TAG}"   "${DB_IMAGE_NAME}:latest"
+    podman tag "${APP_IMAGE_NAME}:${TAG}"   "${APP_IMAGE_NAME}:latest"
+    podman tag "${REPO_IMAGE_NAME}:${TAG}"  "${REPO_IMAGE_NAME}:latest"
+    podman tag "${DB_IMAGE_NAME}:${TAG}"    "${DB_IMAGE_NAME}:latest"
+    podman tag "${PROXY_IMAGE_NAME}:${TAG}" "${PROXY_IMAGE_NAME}:latest"
   fi
 }
 
@@ -330,7 +405,7 @@ build() {
 # Smoke test
 # ---------------------------------------------------------------------------
 teardown_test() {
-  podman rm -f "$TEST_APP_C" "$TEST_REPO_C" "$TEST_DB_C" >/dev/null 2>&1 || true
+  podman rm -f "$TEST_APP_C" "$TEST_REPO_C" "$TEST_DB_C" "$TEST_PROXY_C" >/dev/null 2>&1 || true
   podman network rm -f "$TEST_NET" >/dev/null 2>&1 || true
 }
 
@@ -351,6 +426,10 @@ smoke_test() {
     "${REPO_IMAGE_NAME}:${TAG}" >/dev/null
   podman run -d --network "$TEST_NET" --name "$TEST_APP_C" \
     "${APP_IMAGE_NAME}:${TAG}" >/dev/null
+  # Run the proxy in the app container's network namespace so it reaches
+  # candlepin on localhost:8080, mirroring the shared-namespace pod layout.
+  podman run -d --network "container:${TEST_APP_C}" --name "$TEST_PROXY_C" \
+    "${PROXY_IMAGE_NAME}:${TAG}" >/dev/null
 
   log "Waiting for Candlepin to come up..."
   local ready=0 i
@@ -366,6 +445,8 @@ smoke_test() {
     die "Candlepin failed to start during smoke test"
   fi
 
+  # The proxy listens on 8443 in the same namespace; the status/owners checks above
+  # and below go through it (smoke_curl runs inside the app container).
   smoke_curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
   smoke_curl -sfk -u admin:admin https://localhost:8443/candlepin/owners >/dev/null \
     || die "owners endpoint check failed"
@@ -391,7 +472,7 @@ smoke_test() {
 push_images() {
   log "Pushing images to $REGISTRY"
   local img
-  for img in "$APP_IMAGE_NAME" "$REPO_IMAGE_NAME" "$DB_IMAGE_NAME"; do
+  for img in "$APP_IMAGE_NAME" "$REPO_IMAGE_NAME" "$DB_IMAGE_NAME" "$PROXY_IMAGE_NAME"; do
     podman push "${img}:${TAG}" "${REGISTRY}/${img}:${TAG}"
     if [ "$UPDATE_LATEST" -eq 1 ] && [ "$TAG" != "latest" ]; then
       podman push "${img}:latest" "${REGISTRY}/${img}:latest"
@@ -415,6 +496,7 @@ create_pod() {
     -e "s,ghcr.io/candlepin/${DB_IMAGE_NAME}:latest,${DB_IMAGE_NAME}:${TAG}," \
     -e "s,ghcr.io/candlepin/${APP_IMAGE_NAME}:latest,${APP_IMAGE_NAME}:${TAG}," \
     -e "s,ghcr.io/candlepin/${REPO_IMAGE_NAME}:latest,${REPO_IMAGE_NAME}:${TAG}," \
+    -e "s,ghcr.io/candlepin/${PROXY_IMAGE_NAME}:latest,${PROXY_IMAGE_NAME}:${TAG}," \
     "$POD_FILE" > "$pod_yaml"
 
   # Tear down any previous instance of the pod before (re)creating it.
@@ -439,6 +521,7 @@ log "Done. Built images:"
 echo "  ${APP_IMAGE_NAME}:${TAG}"
 echo "  ${REPO_IMAGE_NAME}:${TAG}"
 echo "  ${DB_IMAGE_NAME}:${TAG}"
+echo "  ${PROXY_IMAGE_NAME}:${TAG}"
 if [ "$UPDATE_LATEST" -eq 1 ] && [ "$TAG" != "latest" ]; then
   echo "  (also tagged :latest)"
 fi

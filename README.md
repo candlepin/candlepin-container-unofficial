@@ -7,11 +7,22 @@ Testing data like user credentials, products, testing repositories and testing R
 could change over time. These images layer test data and certificates onto the upstream
 `dev-latest` image so you can start testing immediately.
 
-| Image              | Base | Purpose |
-|--------------------|------|---------|
-| **candlepin-app**  | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
-| **candlepin-repo** | Red Hat Hummingbird Apache | Apache server providing testing yum repository |
-| **candlepin-db**   | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
+| Image               | Base | Purpose |
+|---------------------|------|---------|
+| **candlepin-app**   | `quay.io/candlepin/candlepin:dev-latest` | Candlepin API + pre-baked test data and yum repos |
+| **candlepin-proxy** | Red Hat Hummingbird nginx | TLS-terminating reverse proxy in front of candlepin-app (public HTTPS on 8443) |
+| **candlepin-repo**  | Red Hat Hummingbird Apache | Apache server providing testing yum repository |
+| **candlepin-db**    | Red Hat Hummingbird PostgreSQL | PostgreSQL with pre-baked schema and test data |
+
+> **Why a proxy?** candlepin-app offers both an ML-DSA (post-quantum) and an RSA
+> TLS server certificate. Go 1.27+ clients advertise ML-DSA in the TLS 1.3
+> `signature_algorithms` extension but omit it from `signature_algorithms_cert`,
+> so when the server selects the ML-DSA certificate the handshake fails with
+> *"no suitable signature algorithm"*. `candlepin-proxy` terminates TLS with a
+> plain RSA certificate (so those clients connect), then forwards requests to
+> candlepin over HTTP while still passing the client certificate through, so
+> mutual-TLS authentication keeps working. This also mirrors how Candlepin is
+> typically fronted by a web server in production.
 
 ## Quick Start: Pod
 
@@ -68,17 +79,17 @@ Environment variables:
 
 ## Building the Images Locally
 
-All three images can be built with a single command:
+All four images can be built with a single command:
 
 ```console
 $ ./build.sh
 ```
 
 This pulls the upstream Candlepin image, boots a throwaway PostgreSQL + app
-pair, imports the test data, bakes the yum repositories, commits the three
-images (`candlepin-app`, `candlepin-repo`, `candlepin-db`), runs a smoke
-test against them, and finally starts the `candlepin` pod from the freshly
-built images. Pass `--no-pod` to skip starting the pod.
+pair, imports the test data, bakes the yum repositories, commits the four
+images (`candlepin-app`, `candlepin-proxy`, `candlepin-repo`, `candlepin-db`),
+runs a smoke test against them, and finally starts the `candlepin` pod from the
+freshly built images. Pass `--no-pod` to skip starting the pod.
 
 By default the test-data scripts are fetched by cloning
 [candlepin](https://github.com/candlepin/candlepin) (`main`). Common options:
@@ -107,6 +118,10 @@ services:
   candlepin:
     image: ghcr.io/candlepin/candlepin-app:latest
     options: --hostname candlepin
+    # candlepin-app serves HTTP on 8080 (consumed by the proxy) and its own TLS
+    # on the internal port 8444. The public HTTPS endpoint is candlepin-proxy.
+  candlepin-proxy:
+    image: ghcr.io/candlepin/candlepin-proxy:latest
     ports:
       - 8443:8443
   candlepin-repo:
@@ -115,6 +130,11 @@ services:
       - 9080:9080
       - 9443:9443
 ```
+
+> Note: with Docker networking (not a shared pod namespace), candlepin-proxy
+> reaches candlepin on `127.0.0.1:8080`, so run it in candlepin-app's network
+> namespace (e.g. `--network container:candlepin`) or adjust `proxy/candlepin.conf`'s
+> `proxy_pass` to the candlepin service name.
 
 ## What These Images Add
 
@@ -135,7 +155,9 @@ empty database. These images layer pre-provisioned test data on top:
 
 | Port | Protocol | Service |
 |------|----------|---------|
-| 8443 | HTTPS | Candlepin API |
+| 8443 | HTTPS | Candlepin API (via candlepin-proxy) |
+| 8444 | HTTPS | Candlepin API direct on candlepin-app (internal, not published) |
+| 8080 | HTTP | candlepin-app for the proxy (internal, not published) |
 | 9080 | HTTP | Test yum repos |
 | 9443 | HTTPS | Test yum repos |
 | 5432 | TCP | PostgreSQL |
