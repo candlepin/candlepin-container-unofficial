@@ -35,12 +35,36 @@ in the `INSTALL.md` file.
 
 ## Configure host
 
-When you want to use candlepin pod for testing on your machine, then it is recommended to run bash
-script provided in this repository:
+When you want to use the candlepin pod for testing on your machine, run the helper script:
 
 ```console
 $ ./configure-host.sh
+$ ./configure-host.sh --help   # show options
+$ ./configure-host.sh my-app-container   # custom container name
 ```
+
+The script runs as a regular user (not via `sudo`; privileged steps use `sudo` internally) and:
+
+1. Adds `127.0.0.1 candlepin` to `/etc/hosts`
+2. Installs Candlepin's CA bundle to `/etc/rhsm/ca` and the system trust store (`/etc/pki/ca-trust`)
+3. Configures `subscription-manager` to use `candlepin:8443/candlepin` and `https://candlepin:9443` for repos
+4. Imports the test RPM GPG key to `/etc/pki/rpm-gpg`
+
+Before overwriting `subscription-manager` settings, the current values for `server.hostname`, `server.port`, `server.prefix`, `rhsm.baseurl` and `rhsm.repo_ca_cert` are saved to a per-user backup file. By default this is `${XDG_STATE_HOME:-$HOME/.local/state}/candlepin-test/subscription-manager.conf.bak` (e.g. `~/.local/state/candlepin-test/subscription-manager.conf.bak`). The file records each value and whether it was a default (`[]` in `subscription-manager config --list`).
+
+To revert all changes:
+
+```console
+$ ./restore-host.sh              # undo all 4 steps
+$ ./restore-host.sh --help
+$ ./restore-host.sh --keep-subman --keep-ca-cert   # keep subman and CA, restore rest
+```
+
+`restore-host.sh` restores the previous `subscription-manager` configuration from the backup, verifies the result with `subscription-manager config --list`, and removes the backup on success. If no backup exists it reports the location searched and leaves the current configuration untouched (use `subscription-manager config --remove` manually to reset to Red Hat defaults). Each step can be skipped individually with `--keep-etc-hosts`, `--keep-ca-cert`, `--keep-subman`, `--keep-gpg-key`; the script is idempotent.
+
+Environment variables:
+
+- `CANDLEPIN_TEST_STATE_DIR` — directory for `subscription-manager.conf.bak`; defaults to `${XDG_STATE_HOME:-$HOME/.local/state}/candlepin-test`. Set the same value for both scripts to use a custom location, e.g. `CANDLEPIN_TEST_STATE_DIR=/tmp/my-backup ./configure-host.sh`. A legacy path `/var/lib/candlepin-test/subscription-manager.conf.bak` is checked by `restore-host.sh` for backward compatibility.
 
 ## Building the Images Locally
 
@@ -88,7 +112,8 @@ services:
   candlepin-repo:
     image: ghcr.io/candlepin/candlepin-repo:latest
     ports:
-      - 8080:8080
+      - 9080:9080
+      - 9443:9443
 ```
 
 ## What These Images Add
@@ -100,8 +125,10 @@ empty database. These images layer pre-provisioned test data on top:
   `test_data.json`
 - **Products, subscriptions, and pools** for all owners
 - **Yum repos** with installable test RPMs (`slow-eagle`, `tricky-frog`,
-  `awesome-rabbit`, etc.) served via Tomcat on port 8080
-- **RPM GPG key** at `http://candlepin:8080/RPM-GPG-KEY-candlepin`
+  `awesome-rabbit`, etc.) served by the repo container on port 9080 (HTTP)
+  and 9443 (HTTPS). The HTTPS listener reuses candlepin-app's TLS certificate,
+  so it validates against the same `candlepin-ca-bundle.crt` as the API.
+- **RPM GPG key** at `http://candlepin:9080/RPM-GPG-KEY-candlepin`
 - **Generated product certificates** embedded in repo metadata
 
 ## Ports
@@ -109,7 +136,8 @@ empty database. These images layer pre-provisioned test data on top:
 | Port | Protocol | Service |
 |------|----------|---------|
 | 8443 | HTTPS | Candlepin API |
-| 8080 | HTTP | Candlepin API + test yum repos |
+| 9080 | HTTP | Test yum repos |
+| 9443 | HTTPS | Test yum repos |
 | 5432 | TCP | PostgreSQL |
 
 ## Test Accounts

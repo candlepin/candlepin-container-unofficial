@@ -6,7 +6,8 @@
 #
 # The containers share the pod's network namespace, so Candlepin reaches
 # PostgreSQL at localhost:5432 and the repo server is available at
-# localhost:8080. Two environment variables override the db_host=postgres
+# localhost:9080 (HTTP) / localhost:9443 (HTTPS). Two environment variables
+# override the db_host=postgres
 # default baked into candlepin.conf (SmallRye Config env vars have ordinal
 # 300, which beats the config file at 225).
 
@@ -39,6 +40,9 @@ spec:
     - name: candlepin-repo
       image: ghcr.io/candlepin/candlepin-repo:latest
       ports:
-        - containerPort: 8080
-          hostPort: 8080
+        - containerPort: 9080
+          hostPort: 9080
+          protocol: TCP
+        - containerPort: 9443
+          hostPort: 9443
           protocol: TCP

@@ -20,16 +20,79 @@
 
 set -euo pipefail
 
-CONTAINER="${1:-candlepin-candlepin-app}"
+usage() {
+  cat <<EOF
+Configure the host system to use Candlepin running in the pod.
+
+Usage: $(basename "$0") [options] [container]
+
+Arguments:
+  container    Name of the candlepin-app container
+               (default: candlepin-candlepin-app, the name podman gives it in
+               the pod; use "candlepin" for the container network setup).
+
+Options:
+  -h, --help   Show this help.
+
+This script:
+  1. Adds candlepin to /etc/hosts
+  2. Installs Candlepin's CA certificate into /etc/rhsm/ca and the system
+     trust store
+  3. Configures subscription-manager to use the Candlepin server and test repos
+  4. Imports the GPG key of the test RPM repository
+
+The current subscription-manager configuration for server.hostname,
+server.port, server.prefix, rhsm.baseurl and rhsm.repo_ca_cert is saved
+to \${CANDLEPIN_TEST_STATE_DIR:-\${XDG_STATE_HOME:-\$HOME/.local/state}/candlepin-test}/subscription-manager.conf.bak
+before being overwritten, so restore-host.sh can restore it.
+
+Environment:
+  CANDLEPIN_TEST_STATE_DIR  Directory for subscription-manager backup
+                            (default: \${XDG_STATE_HOME:-\$HOME/.local/state}/candlepin-test)
+  XDG_STATE_HOME            Base directory for state files (default: \$HOME/.local/state)
+
+Examples:
+  ./configure-host.sh
+  CANDLEPIN_TEST_STATE_DIR=/tmp/my-backup ./configure-host.sh
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+CONTAINER="candlepin-candlepin-app"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help)  usage; exit 0 ;;
+    -*)         echo "ERROR: Unknown option: $1 (try --help)" >&2; exit 1 ;;
+    *)          CONTAINER="$1"; shift ;;
+  esac
+done
 CP_HOSTNAME="candlepin"
 CP_PORT=8443
 CP_PREFIX="/candlepin"
-REPO_URL="http://${CP_HOSTNAME}:8080"
+REPO_URL="https://${CP_HOSTNAME}:9443"
 CA_CRT_FILE_NAME="candlepin-ca-bundle.crt"
 CA_FILE_NAME=${CA_CRT_FILE_NAME%.crt}.pem
 CA_PATH="/etc/rhsm/ca/${CA_FILE_NAME}"
 ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${CA_FILE_NAME}"
 GPG_KEY_PATH="/etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin"
+# Backup of subscription-manager configuration is stored in the invoking user's
+# home directory so it does not require privileged access and survives sudo.
+# XDG_STATE_HOME is respected; override with CANDLEPIN_TEST_STATE_DIR.
+if [ -n "${CANDLEPIN_TEST_STATE_DIR:-}" ]; then
+  STATE_DIR="$CANDLEPIN_TEST_STATE_DIR"
+else
+  if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
+    _USER_HOME="$(getent passwd "$SUDO_USER" 2>/dev/null | cut -d: -f6)"
+    [ -z "${_USER_HOME:-}" ] && _USER_HOME="$HOME"
+  else
+    _USER_HOME="$HOME"
+  fi
+  STATE_DIR="${XDG_STATE_HOME:-$_USER_HOME/.local/state}/candlepin-test"
+  unset _USER_HOME
+fi
+STATE_FILE="$STATE_DIR/subscription-manager.conf.bak"
 
 if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
   echo "WARNING: running via sudo; rootless containers of ${SUDO_USER} will not be visible." >&2
@@ -81,11 +144,46 @@ fi
 # ---------------------------------------------------------------------------
 
 echo "[4/5] Configuring subscription-manager..."
+# Save current subscription-manager configuration for the keys we will
+# overwrite so restore-host.sh can restore the host's previous values
+# instead of resetting to Red Hat defaults. The backup records value and
+# whether it was a default (marked with [] in `config --list`).
+if [ ! -f "$STATE_FILE" ]; then
+  mkdir -p "$STATE_DIR" 2>/dev/null || sudo mkdir -p "$STATE_DIR"
+  SM_LIST="$(subscription-manager config --list 2>/dev/null || sudo subscription-manager config --list 2>/dev/null || true)"
+  {
+    echo "# Backup created by configure-host.sh on $(date -Iseconds 2>/dev/null || date)"
+    for key in server.hostname server.port server.prefix rhsm.baseurl rhsm.repo_ca_cert; do
+      section="${key%%.*}"
+      name="${key#*.}"
+      raw_val="$(printf '%s\n' "$SM_LIST" | awk -v sec="[$section]" -v n="$name" '
+        $0 == sec { in_sec=1; next }
+        /^\[.*\]/ { in_sec=0 }
+        in_sec && $1 == n && $2 == "=" {
+          $1=""; $2=""; sub(/^  */, "", $0); print $0; exit
+        }
+      ')"
+      is_default=0
+      val="$raw_val"
+      if [[ "$val" =~ ^\[(.*)\]$ ]]; then
+        is_default=1
+        val="${BASH_REMATCH[1]}"
+      fi
+      printf '%s|%s|%s\n' "$key" "$val" "$is_default"
+    done
+  } | tee "$STATE_FILE" >/dev/null 2>&1 || sudo tee "$STATE_FILE" >/dev/null
+  chmod 0600 "$STATE_FILE" 2>/dev/null || sudo chmod 0600 "$STATE_FILE" 2>/dev/null || true
+  echo "  saved previous subscription-manager configuration to $STATE_FILE"
+fi
+# repo_ca_cert is written as sslcacert into the generated repo files, so the
+# test repos served over HTTPS by candlepin-repo validate against the same
+# Candlepin CA we installed above.
 sudo subscription-manager config \
   --server.hostname "$CP_HOSTNAME" \
   --server.port "$CP_PORT" \
   --server.prefix "$CP_PREFIX" \
-  --rhsm.baseurl "$REPO_URL"
+  --rhsm.baseurl "$REPO_URL" \
+  --rhsm.repo_ca_cert "$CA_PATH"
 
 echo "[5/5] Importing GPG key of the test RPM repository..."
 curl -sSf -o "${TMP_DIR}/RPM-GPG-KEY-candlepin" "${REPO_URL}/RPM-GPG-KEY-candlepin"
