@@ -77,6 +77,11 @@ CA_CRT_FILE_NAME="candlepin-ca-bundle.crt"
 CA_FILE_NAME=${CA_CRT_FILE_NAME%.crt}.pem
 CA_PATH="/etc/rhsm/ca/${CA_FILE_NAME}"
 ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${CA_FILE_NAME}"
+# candlepin-repo's own CA and the combined bundle installed by configure-host.sh.
+REPO_CA_FILE_NAME="candlepin-repo-ca.pem"
+REPO_CA_PATH="/etc/rhsm/ca/${REPO_CA_FILE_NAME}"
+REPO_CA_ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${REPO_CA_FILE_NAME}"
+COMBINED_CA_PATH="/etc/rhsm/ca/candlepin-combined-ca-bundle.pem"
 GPG_KEY_PATH="/etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin"
 
 # Matches only the exact "127.0.0.1 candlepin" line configure-host.sh writes,
@@ -103,16 +108,20 @@ fi
 # 2. CA certificate / trust store
 # ---------------------------------------------------------------------------
 if [ "$RESTORE_CA_CERT" -eq 1 ]; then
-  echo "[2/4] Removing Candlepin CA certificate from the trust store..."
+  echo "[2/4] Removing Candlepin and repo CA certificates from the trust store..."
   removed_ca=0
-  if [ -e "$ANCHOR_PATH" ] || [ -L "$ANCHOR_PATH" ]; then
-    sudo rm -f "$ANCHOR_PATH"
-    removed_ca=1
-  fi
-  if [ -e "$CA_PATH" ]; then
-    sudo rm -f "$CA_PATH"
-    removed_ca=1
-  fi
+  for path in "$ANCHOR_PATH" "$REPO_CA_ANCHOR_PATH"; do
+    if [ -e "$path" ] || [ -L "$path" ]; then
+      sudo rm -f "$path"
+      removed_ca=1
+    fi
+  done
+  for path in "$CA_PATH" "$REPO_CA_PATH" "$COMBINED_CA_PATH"; do
+    if [ -e "$path" ]; then
+      sudo rm -f "$path"
+      removed_ca=1
+    fi
+  done
   if [ "$removed_ca" -eq 1 ]; then
     if command -v update-ca-trust > /dev/null; then
       sudo update-ca-trust

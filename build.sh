@@ -272,23 +272,51 @@ build() {
          "$httpd_cfg/ssl.conf"
   podman cp "$httpd_cfg/ssl.conf" "$REPO_C:/etc/httpd/conf.d/ssl.conf"
 
-  # Present candlepin-app's own TLS certificate so both services are reachable at
-  # https://candlepin (only the port differs) and validate against the same CA.
-  # candlepin-app uses its self-signed RSA "Server CA" cert directly as the TLS
-  # server cert (see server.xml SSLHostConfig); that cert carries SAN DNS:candlepin
-  # and is included in candlepin-ca-bundle.crt, so any client trusting the bundle
-  # trusts the repo too. We copy it to the paths the stock ssl.conf expects.
-  # Mode 0644 so the apache user (the image's default USER) can read the key.
-  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.crt" "$httpd_cfg/localhost.crt"
-  podman cp "$APP_C:/etc/candlepin/certs/candlepin-rsa-ca.key" "$httpd_cfg/localhost.key"
-  chmod 0644 "$httpd_cfg/localhost.key" "$httpd_cfg/localhost.crt"
-  podman cp "$httpd_cfg/localhost.crt" "$REPO_C:/etc/pki/tls/certs/localhost.crt"
-  podman cp "$httpd_cfg/localhost.key" "$REPO_C:/etc/pki/tls/private/localhost.key"
-  # The CA bundle, so the repo can serve the same trust anchor candlepin publishes.
-  podman cp "$APP_C:/etc/candlepin/certs/candlepin-ca-bundle.crt" \
-    "$REPO_C:/etc/pki/tls/certs/candlepin-ca-bundle.crt"
+  # Give candlepin-repo its own, fully independent CA and server certificate,
+  # instead of reusing candlepin-app's cert/key. This decouples the repo from
+  # candlepin entirely: the repo no longer needs candlepin's private key copied
+  # in, and in deployments where the containers do NOT share a network namespace
+  # (e.g. GitHub Actions service containers) the repo can be reached under its own
+  # hostname "candlepin-repo" rather than having to masquerade as "candlepin".
+  #
+  # The leaf carries SANs for candlepin-repo (separate-container deployments) as
+  # well as candlepin / localhost / 127.0.0.1 (the shared-namespace pod, where the
+  # repo is reached as https://candlepin:9443 or https://localhost:9443), so one
+  # image works in both topologies. Clients fetching repo content must trust this
+  # repo CA (candlepin-repo-ca.crt), which is staged below as a build artifact;
+  # it is independent of candlepin-ca-bundle.crt.
+  log "Generating candlepin-repo's own CA and TLS server certificate"
+  local repo_ca_dir
+  repo_ca_dir="$(mktemp -d)"
+  # Self-signed repo CA.
+  openssl req -x509 -newkey rsa:2048 -nodes -sha256 -days 3650 \
+    -keyout "$repo_ca_dir/repo-ca.key" -out "$repo_ca_dir/repo-ca.crt" \
+    -subj "/O=Candlepin/OU=Candlepin/CN=Candlepin Repo CA" \
+    -addext "basicConstraints=critical,CA:TRUE" \
+    -addext "keyUsage=critical,keyCertSign,cRLSign" >/dev/null 2>&1
+  # Repo server leaf, signed by the repo CA.
+  openssl req -newkey rsa:2048 -nodes -sha256 \
+    -keyout "$repo_ca_dir/repo.key" -out "$repo_ca_dir/repo.csr" \
+    -subj "/O=Candlepin/OU=Candlepin/CN=candlepin-repo" >/dev/null 2>&1
+  openssl x509 -req -in "$repo_ca_dir/repo.csr" -sha256 -days 3650 \
+    -CA "$repo_ca_dir/repo-ca.crt" -CAkey "$repo_ca_dir/repo-ca.key" -CAcreateserial \
+    -extfile <(printf '%s\n' \
+      "basicConstraints=critical,CA:FALSE" \
+      "keyUsage=critical,digitalSignature,keyEncipherment" \
+      "extendedKeyUsage=serverAuth" \
+      "subjectAltName=DNS:candlepin-repo,DNS:candlepin,DNS:localhost,IP:127.0.0.1") \
+    -out "$repo_ca_dir/repo.crt" >/dev/null 2>&1
 
-  rm -rf "$httpd_cfg"
+  # Install the leaf as the repo's TLS server cert at the paths the stock ssl.conf
+  # expects. Mode 0644 so the apache user (the image's default USER) can read the key.
+  chmod 0644 "$repo_ca_dir/repo.crt" "$repo_ca_dir/repo.key"
+  podman cp "$repo_ca_dir/repo.crt" "$REPO_C:/etc/pki/tls/certs/localhost.crt"
+  podman cp "$repo_ca_dir/repo.key" "$REPO_C:/etc/pki/tls/private/localhost.key"
+  # Ship the repo CA inside the image too, so it can be copied out and trusted by
+  # clients (mirrors how candlepin publishes its CA bundle).
+  podman cp "$repo_ca_dir/repo-ca.crt" "$REPO_C:/etc/pki/tls/certs/candlepin-repo-ca.crt"
+
+  rm -rf "$repo_ca_dir" "$httpd_cfg"
 
   log "Provision: copy generated certs"
   podman exec --user root "$APP_C" /opt/provision.sh copy-certs
@@ -309,7 +337,11 @@ build() {
   # jakarta.servlet.request.X509Certificate attribute that candlepin's SSLAuth
   # reads, and RemoteIpValve restores the https scheme from X-Forwarded-Proto.
   log "Provision: configure server.xml for reverse proxy (valves + move TLS to 8444)"
-  podman exec --user root "$APP_C" python3 - <<'PY'
+  # NOTE: -i is required so the heredoc is delivered to the container's stdin.
+  # Without it, `podman exec` does not attach stdin, `python3 -` reads EOF, and the
+  # edit silently does nothing (the committed image keeps its original server.xml,
+  # so registered systems then fail with "Please use SSL" / HTTP 400).
+  podman exec -i --user root "$APP_C" python3 - <<'PY'
 import re, sys
 
 path = "/opt/tomcat/conf/server.xml"
@@ -332,18 +364,22 @@ if 'redirectPort="8443"' in xml:
 
 # 2) Add RemoteIpValve + SSLValve so candlepin still sees the request as HTTPS and
 #    can read the client certificate the proxy forwards (as ssl_client_escaped_cert).
+#    Anchor the insertion on the opening <Host ...> tag, which is always present in
+#    Tomcat's server.xml, rather than on the AccessLogValve (whose exact formatting
+#    varies between candlepin/Tomcat versions and must not silently disappear).
 if "org.apache.catalina.valves.SSLValve" not in xml:
-    access_valve = '<Valve className="org.apache.catalina.valves.AccessLogValve"'
-    if access_valve not in xml:
-        sys.exit("server.xml: could not find AccessLogValve to anchor the insertion")
+    host_open = re.search(r"<Host\b[^>]*>", xml)
+    if not host_open:
+        sys.exit("server.xml: could not find a <Host> element to anchor the valves")
     valves = (
-        '<Valve className="org.apache.catalina.valves.RemoteIpValve"\n'
+        "\n"
+        '        <Valve className="org.apache.catalina.valves.RemoteIpValve"\n'
         '               protocolHeader="X-Forwarded-Proto"\n'
         '               internalProxies=".*" />\n'
-        '        <Valve className="org.apache.catalina.valves.SSLValve" />\n'
-        '        '
+        '        <Valve className="org.apache.catalina.valves.SSLValve" />'
     )
-    xml = xml.replace(access_valve, valves + access_valve, 1)
+    insert_at = host_open.end()
+    xml = xml[:insert_at] + valves + xml[insert_at:]
     changed = True
 
 if not changed:
@@ -352,6 +388,23 @@ if not changed:
 
 with open(path, "w") as f:
     f.write(xml)
+
+# Fail loudly if the result is not what the reverse proxy requires, so a build can
+# never silently produce an app image that answers protected requests with
+# "Please use SSL" (HTTP 400) because RemoteIpValve/SSLValve are missing.
+with open(path) as f:
+    result = f.read()
+missing = [name for name in (
+    "org.apache.catalina.valves.RemoteIpValve",
+    "org.apache.catalina.valves.SSLValve",
+    'protocolHeader="X-Forwarded-Proto"',
+) if name not in result]
+if missing:
+    sys.exit("server.xml: reverse-proxy configuration incomplete, missing: "
+             + ", ".join(missing))
+if 'port="8443"' in result:
+    sys.exit("server.xml: a connector is still on port 8443; the proxy must own it")
+
 print("server.xml: TLS connector moved to 8444 and reverse-proxy valves added")
 PY
 
@@ -450,16 +503,64 @@ smoke_test() {
   smoke_curl -sk https://localhost:8443/candlepin/status | python3 -m json.tool
   smoke_curl -sfk -u admin:admin https://localhost:8443/candlepin/owners >/dev/null \
     || die "owners endpoint check failed"
+
+  # Assert the reverse proxy makes candlepin see requests as secure. A protected
+  # endpoint called with NO credentials must answer 401 (Invalid Credentials),
+  # which proves request.isSecure() is true via RemoteIpValve + X-Forwarded-Proto.
+  # If the valves are missing, candlepin instead answers 400 ("Please use SSL when
+  # accessing protected resources") -- the exact failure registered systems hit.
+  local protected_code
+  protected_code="$(smoke_curl -sk -o /dev/null -w '%{http_code}' \
+    https://localhost:8443/candlepin/consumers/smoke-test-missing/certificates/serials)"
+  if [ "$protected_code" = "400" ]; then
+    die "reverse proxy not forwarding HTTPS scheme: protected endpoint returned 400 (\"Please use SSL\"); RemoteIpValve/SSLValve likely missing from server.xml"
+  elif [ "$protected_code" != "401" ]; then
+    die "unexpected status $protected_code from unauthenticated protected endpoint (expected 401)"
+  fi
+
+  # End-to-end mutual-TLS check: register a consumer over basic auth, then call a
+  # protected endpoint with its identity cert. This exercises the full SSLAuth path
+  # (nginx verifies the client cert and forwards it; SSLValve -> SSLAuth) that a
+  # registered system uses, and is where the reported 400 surfaced.
+  local consumer_json consumer_uuid
+  consumer_json="$(smoke_curl -sk -u admin:admin -X POST \
+    -H 'Content-Type: application/json' \
+    -d '{"name":"cpbuild-smoke","type":{"label":"system"},"facts":{"system.certificate_version":"3.2"}}' \
+    'https://localhost:8443/candlepin/consumers?owner=donaldduck')"
+  # Stage the identity cert/key inside the app container (where smoke_curl runs) and
+  # echo the uuid so we can target the consumer's protected endpoint below.
+  consumer_uuid="$(podman exec -i "$TEST_APP_C" python3 - "$consumer_json" <<'PY'
+import json, sys
+d = json.loads(sys.argv[1])
+open("/tmp/smoke-cert.pem", "w").write(d["idCert"]["cert"])
+open("/tmp/smoke-key.pem", "w").write(d["idCert"]["key"])
+print(d["uuid"])
+PY
+)" || die "consumer registration smoke check failed"
+  local cert_code
+  cert_code="$(smoke_curl -sk -o /dev/null -w '%{http_code}' \
+    --cert /tmp/smoke-cert.pem --key /tmp/smoke-key.pem \
+    "https://localhost:8443/candlepin/consumers/${consumer_uuid}/certificates/serials")"
+  [ "$cert_code" = "200" ] \
+    || die "consumer-cert (SSLAuth) smoke check failed: got $cert_code from certificates/serials (expected 200)"
   smoke_curl --head -sf "http://${TEST_REPO_C}:9080/RPM-GPG-KEY-candlepin" >/dev/null \
     || die "GPG key check failed"
   smoke_curl --head -sf "http://${TEST_REPO_C}:9080/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "repo metadata check failed"
   smoke_curl --head -sf "http://${TEST_REPO_C}:9080/donaldduck/path/to/fake-content/38072-3902/repodata/repomd.xml" >/dev/null \
     || die "owner repo metadata check failed"
+  # Repo HTTPS now uses the repo's own independent CA (candlepin-repo-ca.crt) and a
+  # leaf whose canonical name is "candlepin-repo". Stage the repo CA into the app
+  # container (where smoke_curl runs) and validate against it as candlepin-repo.
+  local repo_ca_tmp
+  repo_ca_tmp="$(mktemp -d)"
+  podman cp "$TEST_REPO_C:/etc/pki/tls/certs/candlepin-repo-ca.crt" "$repo_ca_tmp/candlepin-repo-ca.crt"
+  podman cp "$repo_ca_tmp/candlepin-repo-ca.crt" "$TEST_APP_C:/tmp/candlepin-repo-ca.crt"
+  rm -rf "$repo_ca_tmp"
   smoke_curl --head -sf \
-    --cacert /etc/candlepin/certs/candlepin-ca-bundle.crt \
-    --connect-to "candlepin:9443:${TEST_REPO_C}:9443" \
-    "https://candlepin:9443/RPM-GPG-KEY-candlepin" >/dev/null \
+    --cacert /tmp/candlepin-repo-ca.crt \
+    --connect-to "candlepin-repo:9443:${TEST_REPO_C}:9443" \
+    "https://candlepin-repo:9443/RPM-GPG-KEY-candlepin" >/dev/null \
     || die "repo HTTPS (9443) check failed"
   log "Smoke test passed"
 
