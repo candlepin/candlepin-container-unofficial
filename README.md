@@ -146,8 +146,11 @@ empty database. These images layer pre-provisioned test data on top:
 - **Products, subscriptions, and pools** for all owners
 - **Yum repos** with installable test RPMs (`slow-eagle`, `tricky-frog`,
   `awesome-rabbit`, etc.) served by the repo container on port 9080 (HTTP)
-  and 9443 (HTTPS). The HTTPS listener reuses candlepin-app's TLS certificate,
-  so it validates against the same `candlepin-ca-bundle.crt` as the API.
+  and 9443 (HTTPS). The HTTPS listener uses candlepin-repo's own independent CA
+  and server certificate (`candlepin-repo-ca.crt`, baked into the image), so it
+  is decoupled from the API's `candlepin-ca-bundle.crt`. Clients that fetch repo
+  content over HTTPS must trust `candlepin-repo-ca.crt` (configure-host.sh
+  installs it and points `rhsm.repo_ca_cert` at a combined bundle).
 - **RPM GPG key** at `http://candlepin:9080/RPM-GPG-KEY-candlepin`
 - **Generated product certificates** embedded in repo metadata
 

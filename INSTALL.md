@@ -52,33 +52,42 @@ container to your system's DNS so `candlepin` resolves:
 $ echo '127.0.0.1 candlepin' | sudo tee -a /etc/hosts
 ```
 
-Then copy the CA certificate and update the trust store:
+Then copy the CA certificates and update the trust store. candlepin-app (the
+API) and candlepin-repo (the test yum repos) use **separate** CAs, so import
+both. The repo CA lives inside the candlepin-repo container:
 
 ```console
 $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca-bundle.crt . && \
   sudo mv ./candlepin-ca-bundle.crt /etc/rhsm/ca/candlepin-ca-bundle.pem
+$ podman cp candlepin-candlepin-repo:/etc/pki/tls/certs/candlepin-repo-ca.crt . && \
+  sudo mv ./candlepin-repo-ca.crt /etc/rhsm/ca/candlepin-repo-ca.pem
 $ sudo ln -s /etc/rhsm/ca/candlepin-ca-bundle.pem \
   /etc/pki/ca-trust/source/anchors/candlepin-ca-bundle.pem
+$ sudo ln -s /etc/rhsm/ca/candlepin-repo-ca.pem \
+  /etc/pki/ca-trust/source/anchors/candlepin-repo-ca.pem
 $ sudo update-ca-trust
-$ sudo chown root:root /etc/rhsm/ca/candlepin-ca-bundle.pem
-$ sudo restorecon -v /etc/rhsm/ca/candlepin-ca-bundle.pem
+$ sudo chown root:root /etc/rhsm/ca/candlepin-ca-bundle.pem /etc/rhsm/ca/candlepin-repo-ca.pem
+$ sudo restorecon -v /etc/rhsm/ca/candlepin-ca-bundle.pem /etc/rhsm/ca/candlepin-repo-ca.pem
 $ curl https://candlepin:8443/candlepin/status
 ```
 
-Configure subscription-manager to use the container:
+Configure subscription-manager to use the container. `rhsm.repo_ca_cert`
+accepts a single file, so point it at a combined bundle containing both CAs:
 
 ```console
+$ cat /etc/rhsm/ca/candlepin-ca-bundle.pem /etc/rhsm/ca/candlepin-repo-ca.pem \
+  | sudo tee /etc/rhsm/ca/candlepin-combined-ca-bundle.pem > /dev/null
 $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
   --rhsm.baseurl https://candlepin:9443 \
-  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-ca-bundle.pem
+  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-combined-ca-bundle.pem
 ```
 
 `repo_ca_cert` is written as `sslcacert` into the generated repo files, so
-the test repos served over HTTPS validate against the Candlepin CA imported
-above.
+the test repos served over HTTPS validate against the repo CA in the combined
+bundle above.
 
 To install packages from the test RPM repository, import the GPG key:
 
