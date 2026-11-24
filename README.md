@@ -150,7 +150,7 @@ empty database. These images layer pre-provisioned test data on top:
   and server certificate (`candlepin-repo-ca.crt`, baked into the image), so it
   is decoupled from the API's `candlepin-ca-bundle.crt`. Clients that fetch repo
   content over HTTPS must trust `candlepin-repo-ca.crt` (configure-host.sh
-  installs it and points `rhsm.repo_ca_cert` at a combined bundle).
+  installs it and points `rhsm.repo_ca_cert` at a `candlepin-repo-ca.pem`).
 - **RPM GPG key** at `http://candlepin:9080/RPM-GPG-KEY-candlepin`
 - **Generated product certificates** embedded in repo metadata
 

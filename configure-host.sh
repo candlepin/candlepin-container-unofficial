@@ -78,7 +78,7 @@ CA_PATH="/etc/rhsm/ca/${CA_FILE_NAME}"
 ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${CA_FILE_NAME}"
 # candlepin-repo serves its test yum repos over HTTPS with its own independent CA
 # (candlepin-repo-ca.crt), separate from candlepin's API CA. We install it
-# alongside the candlepin CA and point rhsm.repo_ca_cert at a combined bundle so
+# alongside the candlepin CA and point rhsm.repo_ca_cert at a candlepin-repo-ca so
 # repo content validates. REPO_CONTAINER is the candlepin-repo container; in the
 # shared-namespace pod it is a sibling of the app container.
 REPO_CONTAINER="candlepin-candlepin-repo"
@@ -86,9 +86,6 @@ REPO_CA_CRT_FILE_NAME="candlepin-repo-ca.crt"
 REPO_CA_FILE_NAME=${REPO_CA_CRT_FILE_NAME%.crt}.pem
 REPO_CA_PATH="/etc/rhsm/ca/${REPO_CA_FILE_NAME}"
 REPO_CA_ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${REPO_CA_FILE_NAME}"
-# Combined bundle (candlepin API CA + repo CA) used as rhsm.repo_ca_cert.
-COMBINED_CA_FILE_NAME="candlepin-combined-ca-bundle.pem"
-COMBINED_CA_PATH="/etc/rhsm/ca/${COMBINED_CA_FILE_NAME}"
 GPG_KEY_PATH="/etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin"
 # Backup of subscription-manager configuration is stored in the invoking user's
 # home directory so it does not require privileged access and survives sudo.
@@ -146,12 +143,9 @@ sudo ln -sf "$CA_PATH" "$ANCHOR_PATH"
 podman cp "${REPO_CONTAINER}:/etc/pki/tls/certs/${REPO_CA_CRT_FILE_NAME}" "${TMP_DIR}/${REPO_CA_FILE_NAME}"
 sudo install -D -o root -g root -m 0644 "${TMP_DIR}/${REPO_CA_FILE_NAME}" "$REPO_CA_PATH"
 sudo ln -sf "$REPO_CA_PATH" "$REPO_CA_ANCHOR_PATH"
-# Combined bundle for rhsm.repo_ca_cert (subscription-manager accepts a single file).
-cat "${TMP_DIR}/${CA_FILE_NAME}" "${TMP_DIR}/${REPO_CA_FILE_NAME}" > "${TMP_DIR}/${COMBINED_CA_FILE_NAME}"
-sudo install -D -o root -g root -m 0644 "${TMP_DIR}/${COMBINED_CA_FILE_NAME}" "$COMBINED_CA_PATH"
 sudo update-ca-trust
 if command -v restorecon > /dev/null; then
-  sudo restorecon -v "$CA_PATH" "$REPO_CA_PATH" "$COMBINED_CA_PATH"
+  sudo restorecon -v "$CA_PATH" "$REPO_CA_PATH"
 fi
 
 echo "[3/5] Verifying TLS connection to https://${CP_HOSTNAME}:${CP_PORT}${CP_PREFIX}/status ..."
@@ -197,14 +191,14 @@ if [ ! -f "$STATE_FILE" ]; then
   echo "  saved previous subscription-manager configuration to $STATE_FILE"
 fi
 # repo_ca_cert is written as sslcacert into the generated repo files. Since
-# candlepin-repo now has its own CA, point it at the combined bundle (candlepin
-# API CA + repo CA) so the test repos served over HTTPS by candlepin-repo validate.
+# candlepin-repo now has its own CA, point it at this repo CA, so the test
+# repos served over HTTPS by candlepin-repo validate.
 sudo subscription-manager config \
   --server.hostname "$CP_HOSTNAME" \
   --server.port "$CP_PORT" \
   --server.prefix "$CP_PREFIX" \
   --rhsm.baseurl "$REPO_URL" \
-  --rhsm.repo_ca_cert "$COMBINED_CA_PATH"
+  --rhsm.repo_ca_cert "$REPO_CA_PATH"
 
 echo "[5/5] Importing GPG key of the test RPM repository..."
 curl -sSf -o "${TMP_DIR}/RPM-GPG-KEY-candlepin" "${REPO_URL}/RPM-GPG-KEY-candlepin"

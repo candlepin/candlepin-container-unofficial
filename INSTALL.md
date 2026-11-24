@@ -59,7 +59,7 @@ both. The repo CA lives inside the candlepin-repo container:
 ```console
 $ podman cp candlepin:/etc/candlepin/certs/candlepin-ca-bundle.crt . && \
   sudo mv ./candlepin-ca-bundle.crt /etc/rhsm/ca/candlepin-ca-bundle.pem
-$ podman cp candlepin-candlepin-repo:/etc/pki/tls/certs/candlepin-repo-ca.crt . && \
+$ podman cp candlepin-repo:/etc/pki/tls/certs/candlepin-repo-ca.crt . && \
   sudo mv ./candlepin-repo-ca.crt /etc/rhsm/ca/candlepin-repo-ca.pem
 $ sudo ln -s /etc/rhsm/ca/candlepin-ca-bundle.pem \
   /etc/pki/ca-trust/source/anchors/candlepin-ca-bundle.pem
@@ -72,22 +72,19 @@ $ curl https://candlepin:8443/candlepin/status
 ```
 
 Configure subscription-manager to use the container. `rhsm.repo_ca_cert`
-accepts a single file, so point it at a combined bundle containing both CAs:
+accepts a single file, so point it at a candlepin-repo-ca:
 
 ```console
-$ cat /etc/rhsm/ca/candlepin-ca-bundle.pem /etc/rhsm/ca/candlepin-repo-ca.pem \
-  | sudo tee /etc/rhsm/ca/candlepin-combined-ca-bundle.pem > /dev/null
 $ sudo subscription-manager config \
   --server.hostname candlepin \
   --server.port 8443 \
   --server.prefix /candlepin \
   --rhsm.baseurl https://candlepin:9443 \
-  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-combined-ca-bundle.pem
+  --rhsm.repo_ca_cert /etc/rhsm/ca/candlepin-repo-ca.pem
 ```
 
 `repo_ca_cert` is written as `sslcacert` into the generated repo files, so
-the test repos served over HTTPS validate against the repo CA in the combined
-bundle above.
+the test repos served over HTTPS validate against the repo CA in the candlepin-repo-ca.
 
 To install packages from the test RPM repository, import the GPG key:
 

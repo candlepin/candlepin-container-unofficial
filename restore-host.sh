@@ -77,11 +77,10 @@ CA_CRT_FILE_NAME="candlepin-ca-bundle.crt"
 CA_FILE_NAME=${CA_CRT_FILE_NAME%.crt}.pem
 CA_PATH="/etc/rhsm/ca/${CA_FILE_NAME}"
 ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${CA_FILE_NAME}"
-# candlepin-repo's own CA and the combined bundle installed by configure-host.sh.
+# candlepin-repo's own CA installed by configure-host.sh.
 REPO_CA_FILE_NAME="candlepin-repo-ca.pem"
 REPO_CA_PATH="/etc/rhsm/ca/${REPO_CA_FILE_NAME}"
 REPO_CA_ANCHOR_PATH="/etc/pki/ca-trust/source/anchors/${REPO_CA_FILE_NAME}"
-COMBINED_CA_PATH="/etc/rhsm/ca/candlepin-combined-ca-bundle.pem"
 GPG_KEY_PATH="/etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin"
 
 # Matches only the exact "127.0.0.1 candlepin" line configure-host.sh writes,
@@ -116,7 +115,7 @@ if [ "$RESTORE_CA_CERT" -eq 1 ]; then
       removed_ca=1
     fi
   done
-  for path in "$CA_PATH" "$REPO_CA_PATH" "$COMBINED_CA_PATH"; do
+  for path in "$CA_PATH" "$REPO_CA_PATH"; do
     if [ -e "$path" ]; then
       sudo rm -f "$path"
       removed_ca=1
