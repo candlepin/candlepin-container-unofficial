@@ -14,7 +14,7 @@ set -Eeuo pipefail
 # ---------------------------------------------------------------------------
 UPSTREAM_IMAGE="quay.io/candlepin/candlepin:dev-latest"
 HTTPD_IMAGE="quay.io/hummingbird/httpd:latest"
-CANDLEPIN_REF="main"
+CANDLEPIN_REF=""
 DEPLOYMENT_DIR=""
 TAG=""
 REGISTRY="ghcr.io/candlepin"
@@ -72,10 +72,11 @@ Options:
                          (default: quay.io/candlepin/candlepin:dev-latest)
   --httpd-image IMG      httpd base image for the repo container
                          (default: quay.io/hummingbird/httpd:latest)
-  --candlepin-ref REF    candlepin git ref to fetch the test-data scripts from
-                         (default: main). Ignored when --deployment-dir is set.
-  --deployment-dir DIR   Use an existing bin/deployment directory instead of
-                         cloning candlepin (e.g. a local candlepin checkout).
+  --candlepin-ref REF    Fetch the test-data scripts from this candlepin git ref
+                         instead of using this repository's own bin/deployment
+                         copy. Ignored when --deployment-dir is set.
+  --deployment-dir DIR   Use an existing bin/deployment directory instead of this
+                         repository's copy (e.g. a local candlepin checkout).
   --tag TAG              Image tag (default: derived from the upstream image's
                          org.opencontainers.image.version label, else "latest").
   --registry REG         Registry prefix used when pushing
@@ -88,7 +89,8 @@ Options:
   -h, --help             Show this help.
 
 Examples:
-  ./build.sh                                   # build + test, no push
+  ./build.sh                                   # build + test using this repo's bin/deployment
+  ./build.sh --candlepin-ref main              # build + test using upstream candlepin's scripts
   ./build.sh --deployment-dir ../candlepin/bin/deployment
   ./build.sh --push --registry ghcr.io/myuser  # build + test + push
 EOF
@@ -160,7 +162,7 @@ resolve_deployment_dir() {
   if [ -n "$DEPLOYMENT_DIR" ]; then
     [ -d "$DEPLOYMENT_DIR" ] || die "--deployment-dir '$DEPLOYMENT_DIR' does not exist"
     log "Using test-data scripts from $DEPLOYMENT_DIR"
-  else
+  elif [ -n "$CANDLEPIN_REF" ]; then
     command -v git >/dev/null || die "git is required to clone candlepin (or use --deployment-dir)"
     TMP_DIR="$(mktemp -d)"
     log "Cloning candlepin@${CANDLEPIN_REF} (sparse: bin/deployment)"
@@ -169,6 +171,10 @@ resolve_deployment_dir() {
       https://github.com/candlepin/candlepin.git "$TMP_DIR/candlepin.git"
     git -C "$TMP_DIR/candlepin.git" sparse-checkout set bin/deployment >/dev/null
     DEPLOYMENT_DIR="$TMP_DIR/candlepin.git/bin/deployment"
+  else
+    DEPLOYMENT_DIR="$SCRIPT_DIR/bin/deployment"
+    [ -d "$DEPLOYMENT_DIR" ] || die "local deployment dir '$DEPLOYMENT_DIR' does not exist"
+    log "Using test-data scripts from this repository: $DEPLOYMENT_DIR"
   fi
   for f in test_data_importer.py test_data.json create_test_repos.py deploy_pkg; do
     [ -e "$DEPLOYMENT_DIR/$f" ] || die "missing $f in $DEPLOYMENT_DIR"
