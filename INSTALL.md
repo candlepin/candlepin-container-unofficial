@@ -92,6 +92,31 @@ To install packages from the test RPM repository, import the GPG key:
 $ sudo curl -o /etc/pki/rpm-gpg/RPM-GPG-KEY-candlepin https://candlepin:9443/RPM-GPG-KEY-candlepin
 ```
 
+## Release/tag-gated content (product certificate)
+
+Some test content is gated on a product tag and served per release via a
+`$releasever` path (see the `required_tags`/`releases` entries in
+`bin/deployment/test_data.json`, e.g. the RHEL 10 and Fedora 45 content).
+`subscription-manager` only enables such content when a product certificate
+providing the matching tag is installed in `/etc/pki/product-default`.
+
+RHEL ships that certificate; Fedora does not. `configure-host.sh` installs one
+automatically when none is present, so in the normal flow you do not need to do
+anything. To install one manually (its defaults are derived from
+`/etc/os-release`, e.g. tag `fedora-45` on Fedora 45):
+
+```console
+$ ./create-product-cert.sh
+```
+
+The certificate is signed by the Candlepin CA fetched from the running
+`candlepin-app` container. Use `--help` to override any field (name, version,
+arch, tags, product id), or `--no-install` to only emit the PEM.
+
+After installing it, `subscription-manager release --list` shows the available
+releases and `subscription-manager release --set=<release>` selects the one
+`$releasever` resolves to.
+
 ## Overriding the database hostname
 
 Candlepin uses [SmallRye Config](https://smallrye.io/smallrye-config/)

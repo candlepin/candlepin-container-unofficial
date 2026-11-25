@@ -17,8 +17,12 @@
 # 2. Installs Candlepin's CA certificate into /etc/rhsm/ca and the system trust store
 # 3. Configures subscription-manager to use the Candlepin server and test repos
 # 4. Imports the GPG key of the test RPM repository
+# 5. Installs a product certificate (via create-product-cert.sh) if none exists,
+#    so tag/release-gated content can be enabled
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<EOF
@@ -40,6 +44,8 @@ This script:
      trust store
   3. Configures subscription-manager to use the Candlepin server and test repos
   4. Imports the GPG key of the test RPM repository
+  5. Installs a product certificate (via create-product-cert.sh) if none is
+     present, so tag/release-gated content can be enabled
 
 The current subscription-manager configuration for server.hostname,
 server.port, server.prefix, rhsm.baseurl and rhsm.repo_ca_cert is saved
@@ -125,14 +131,14 @@ fi
 # TLS Certificate Trust
 # ---------------------------------------------------------------------------
 
-echo "[1/5] Adding ${CP_HOSTNAME} to /etc/hosts..."
+echo "[1/6] Adding ${CP_HOSTNAME} to /etc/hosts..."
 if grep -qE "^127\.0\.0\.1[[:space:]]+${CP_HOSTNAME//./\\.}([[:space:]]|$)" /etc/hosts; then
   echo "  ${CP_HOSTNAME} is already present in /etc/hosts, skipping"
 else
   echo "127.0.0.1 ${CP_HOSTNAME}" | sudo tee -a /etc/hosts > /dev/null
 fi
 
-echo "[2/5] Installing Candlepin and repo CA certificates..."
+echo "[2/6] Installing Candlepin and repo CA certificates..."
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TMP_DIR"' EXIT
 # Candlepin API CA.
@@ -148,7 +154,7 @@ if command -v restorecon > /dev/null; then
   sudo restorecon -v "$CA_PATH" "$REPO_CA_PATH"
 fi
 
-echo "[3/5] Verifying TLS connection to https://${CP_HOSTNAME}:${CP_PORT}${CP_PREFIX}/status ..."
+echo "[3/6] Verifying TLS connection to https://${CP_HOSTNAME}:${CP_PORT}${CP_PREFIX}/status ..."
 if ! curl -sSf -o /dev/null "https://${CP_HOSTNAME}:${CP_PORT}${CP_PREFIX}/status"; then
   echo "ERROR: Candlepin status check failed (is the server fully started?)" >&2
   exit 1
@@ -158,7 +164,7 @@ fi
 # Subscription Manager configuration
 # ---------------------------------------------------------------------------
 
-echo "[4/5] Configuring subscription-manager..."
+echo "[4/6] Configuring subscription-manager..."
 # Save current subscription-manager configuration for the keys we will
 # overwrite so restore-host.sh can restore the host's previous values
 # instead of resetting to Red Hat defaults. The backup records value and
@@ -200,8 +206,34 @@ sudo subscription-manager config \
   --rhsm.baseurl "$REPO_URL" \
   --rhsm.repo_ca_cert "$REPO_CA_PATH"
 
-echo "[5/5] Importing GPG key of the test RPM repository..."
+echo "[5/6] Importing GPG key of the test RPM repository..."
 curl -sSf -o "${TMP_DIR}/RPM-GPG-KEY-candlepin" "${REPO_URL}/RPM-GPG-KEY-candlepin"
 sudo install -D -o root -g root -m 0644 "${TMP_DIR}/RPM-GPG-KEY-candlepin" "$GPG_KEY_PATH"
+
+# ---------------------------------------------------------------------------
+# Product certificate
+# ---------------------------------------------------------------------------
+# Tag/release-gated content (required_tags in test_data.json) is only enabled
+# when a product certificate is installed. RHEL ships one; Fedora does not. If
+# none is present, generate one matching this distribution (via os-release).
+echo "[6/6] Ensuring a product certificate is installed..."
+have_product_cert=0
+for d in /etc/pki/product-default /etc/pki/product; do
+  if ls "$d"/*.pem > /dev/null 2>&1; then
+    have_product_cert=1
+    break
+  fi
+done
+if [ "$have_product_cert" -eq 1 ]; then
+  echo "  a product certificate is already installed, skipping"
+elif [ ! -x "$SCRIPT_DIR/create-product-cert.sh" ]; then
+  echo "  WARNING: $SCRIPT_DIR/create-product-cert.sh not found or not executable;" >&2
+  echo "           tag-gated content will not be enabled" >&2
+elif "$SCRIPT_DIR/create-product-cert.sh" "$CONTAINER"; then
+  :
+else
+  echo "  WARNING: failed to create a product certificate;" >&2
+  echo "           tag-gated content will not be enabled" >&2
+fi
 
 echo "Done. The system is configured to use Candlepin at https://${CP_HOSTNAME}:${CP_PORT}${CP_PREFIX}"
