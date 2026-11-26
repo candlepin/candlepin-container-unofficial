@@ -109,6 +109,7 @@ else
   unset _USER_HOME
 fi
 STATE_FILE="$STATE_DIR/subscription-manager.conf.bak"
+PRODUCT_CERT_STATE_FILE="$STATE_DIR/product-cert.created"
 
 if [ "$(id -u)" -eq 0 ] && [ -n "${SUDO_USER:-}" ]; then
   echo "WARNING: running via sudo; rootless containers of ${SUDO_USER} will not be visible." >&2
@@ -229,7 +230,7 @@ if [ "$have_product_cert" -eq 1 ]; then
 elif [ ! -x "$SCRIPT_DIR/create-product-cert.sh" ]; then
   echo "  WARNING: $SCRIPT_DIR/create-product-cert.sh not found or not executable;" >&2
   echo "           tag-gated content will not be enabled" >&2
-elif "$SCRIPT_DIR/create-product-cert.sh" "$CONTAINER"; then
+elif "$SCRIPT_DIR/create-product-cert.sh" --state-file "$PRODUCT_CERT_STATE_FILE" "$CONTAINER"; then
   :
 else
   echo "  WARNING: failed to create a product certificate;" >&2
