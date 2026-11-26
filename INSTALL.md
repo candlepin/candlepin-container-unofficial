@@ -106,7 +106,7 @@ anything. To install one manually (its defaults are derived from
 `/etc/os-release`, e.g. tag `fedora-45` on Fedora 45):
 
 ```console
-$ ./create-product-cert.sh
+$ ./create-product-cert.sh candlepin
 ```
 
 The certificate is signed by the Candlepin CA fetched from the running

@@ -48,6 +48,7 @@ BRAND_TYPE=""
 BRAND_NAME=""
 INSTALL_DIR="/etc/pki/product-default"
 INSTALL=1
+STATE_FILE=""
 
 # OID prefix for Red Hat product certificates.
 OID_BASE="1.3.6.1.4.1.2312.9.1"
@@ -80,6 +81,9 @@ Options:
   --brand-name NAME    Optional brand name.
   --install-dir DIR    Directory to install the certificate into
                        (default: ${INSTALL_DIR}).
+  --state-file FILE    Write the path of the installed certificate to FILE
+                       (used by configure-host.sh to track the default
+                       product certificate for later removal).
   --no-install         Only write <ID>.pem to the current directory; do not
                        install into ${INSTALL_DIR}.
   -h, --help           Show this help.
@@ -109,6 +113,7 @@ while [ $# -gt 0 ]; do
     --brand-type)   BRAND_TYPE="$2"; shift 2 ;;
     --brand-name)   BRAND_NAME="$2"; shift 2 ;;
     --install-dir)  INSTALL_DIR="$2"; shift 2 ;;
+    --state-file)   STATE_FILE="$2"; shift 2 ;;
     --no-install)   INSTALL=0; shift ;;
     -h|--help)      usage; exit 0 ;;
     -*)             echo "ERROR: Unknown option: $1 (try --help)" >&2; exit 1 ;;
@@ -200,6 +205,17 @@ if [ "$INSTALL" -eq 1 ]; then
   sudo install -D -o root -g root -m 0644 "$CERT_OUT" "${INSTALL_DIR}/${PRODUCT_ID}.pem"
   if command -v restorecon > /dev/null; then
     sudo restorecon -v "${INSTALL_DIR}/${PRODUCT_ID}.pem" >/dev/null 2>&1 || true
+  fi
+  if [ -n "$STATE_FILE" ]; then
+    STATE_DIR_TO_CREATE="$(dirname "$STATE_FILE")"
+    mkdir -p "$STATE_DIR_TO_CREATE" 2>/dev/null || sudo mkdir -p "$STATE_DIR_TO_CREATE" 2>/dev/null || true
+    if ! printf '%s\n' "${INSTALL_DIR}/${PRODUCT_ID}.pem" > "$STATE_FILE" 2>/dev/null; then
+      printf '%s\n' "${INSTALL_DIR}/${PRODUCT_ID}.pem" | sudo tee "$STATE_FILE" >/dev/null 2>&1 || true
+    fi
+    chmod 0600 "$STATE_FILE" 2>/dev/null || sudo chmod 0600 "$STATE_FILE" 2>/dev/null || true
+    if [ -s "$STATE_FILE" ]; then
+      echo "  recorded product certificate path to $STATE_FILE"
+    fi
   fi
   echo "Done. Installed product certificate providing tags: ${PRODUCT_TAGS}"
 else
